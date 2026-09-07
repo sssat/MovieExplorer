@@ -1,69 +1,213 @@
-﻿using System.Text;
+using System.Globalization;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using MovieExplorer.Configuration;
+using MovieExplorer.Models;
+using MovieExplorer.Services;
 
-namespace MovieExplorer
+namespace MovieExplorer;
+
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    private const string KobisSource = "국내 박스오피스 (KOBIS)";
+    private const string TmdbSource = "한국 지역 상영 중 (TMDB)";
+
+    private List<Movie> movies = [];
+    private bool windowLoaded;
+
+    public MainWindow()
     {
-        public MainWindow()
+        InitializeComponent();
+        SourceBox.ItemsSource = new[] { KobisSource, TmdbSource };
+        SourceBox.SelectedIndex = 0;
+        BoxOfficeDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
+        GenreBox.ItemsSource = new[] { "전체" };
+        GenreBox.SelectedIndex = 0;
+    }
+
+    private async void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        windowLoaded = true;
+        await LoadMoviesAsync();
+    }
+
+    private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
+
+    private async void SourceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        bool isKobis = SourceBox.SelectedItem as string == KobisSource;
+        BoxOfficeDatePicker.Visibility = isKobis ? Visibility.Visible : Visibility.Hidden;
+        PageEyebrow.Text = isKobis ? "DAILY BOX OFFICE IN KOREA" : "NOW PLAYING IN KOREA";
+        PageTitle.Text = isKobis ? "국내 일별 박스오피스" : "한국 지역 상영 중";
+        PageDescription.Text = isKobis
+            ? "KOBIS 관객 수 순위와 TMDB 영화 정보를 함께 보여줍니다."
+            : "TMDB의 한국 지역 개봉 정보를 기준으로 영화를 보여줍니다.";
+
+        if (windowLoaded)
+            await LoadMoviesAsync();
+    }
+
+    private async Task LoadMoviesAsync()
+    {
+        ShowStatus("영화 정보를 불러오는 중입니다…");
+        try
         {
-            InitializeComponent();
-            GenreBox.ItemsSource = new[] { "전체", "SF", "로맨스", "스릴러", "코미디", "드라마", "액션" };
+            movies = SourceBox.SelectedItem as string == KobisSource
+                ? await LoadKobisMoviesAsync()
+                : await LoadTmdbMoviesAsync();
+
+            GenreBox.ItemsSource = new[] { "전체" }
+                .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name));
             GenreBox.SelectedIndex = 0;
+            ApplyFilter();
         }
-
-        private readonly List<Movie> movies = new()
+        catch (HttpRequestException exception)
         {
-            new("별이 머무는 밤", "A NIGHT AMONG STARS", "SF", 128, "12세 이상", "사라진 별의 신호를 따라 두 탐사자가 우주 끝의 정거장으로 향한다.", "#293B66", "01"),
-            new("여름의 편지", "LETTERS FROM SUMMER", "로맨스", 112, "12세 이상", "오래된 우체통에서 발견한 편지 한 통. 잊었던 여름이 다시 시작된다.", "#476C62", "02"),
-            new("마지막 플랫폼", "THE LAST PLATFORM", "스릴러", 119, "15세 이상", "막차가 떠난 역에 남겨진 다섯 사람. 전광판에 낯선 목적지가 나타난다.", "#553C59", "03"),
-            new("우리 동네 히어로", "THE EVERYDAY HERO", "코미디", 104, "전체 관람가", "평범한 이웃들이 동네 축제를 지키기 위해 특별한 작전을 시작한다.", "#866036", "04"),
-            new("파도의 기억", "MEMORIES OF THE SEA", "드라마", 121, "전체 관람가", "고향 바다로 돌아온 사진가가 아버지의 필름 속에서 새로운 이야기를 발견한다.", "#30576B", "05"),
-            new("제로 아워", "ZERO HOUR", "액션", 132, "15세 이상", "도시의 모든 시계가 멈춘 순간, 마지막 임무를 맡은 요원의 추격이 시작된다.", "#713F40", "06")
-        };
-
-        private void FilterChanged(object sender, RoutedEventArgs e)
-        {
-            if (MovieCards is null || GenreBox is null || SearchBox is null) return;
-            string query = SearchBox.Text.Trim();
-            string genre = GenreBox.SelectedItem as string ?? "전체";
-            var filtered = movies.Where(movie => (genre == "전체" || movie.Genre == genre)
-                && (movie.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || movie.EnglishTitle.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || movie.Synopsis.Contains(query, StringComparison.OrdinalIgnoreCase))).ToList();
-            MovieCards.ItemsSource = filtered;
-            ResultLabel.Text = $"총 {filtered.Count}편";
-            EmptyMessage.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            ShowStatus($"영화 정보를 불러오지 못했습니다.\n{exception.Message}", true);
         }
-
-        private void ResetFilters(object sender, RoutedEventArgs e)
+        catch (TaskCanceledException)
         {
-            SearchBox.Clear();
-            GenreBox.SelectedIndex = 0;
+            ShowStatus("API 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.", true);
         }
-
-        private void ShowMovie(object sender, RoutedEventArgs e)
+        catch (Exception exception)
         {
-            if (sender is Button { Tag: Movie movie })
-                MessageBox.Show(this, $"{movie.Metadata}\n\n{movie.Synopsis}\n\n화면 시연용 가상 영화입니다. 실제 영화 정보는 API 연동 후 제공됩니다.", movie.Title,
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowStatus(exception.Message, true);
         }
     }
 
-    public sealed record Movie(string Title, string EnglishTitle, string Genre, int Runtime,
-        string Rating, string Synopsis, string PosterColor, string Number)
+    private async Task<List<Movie>> LoadTmdbMoviesAsync()
     {
-        public string Metadata => $"{Rating} · {Genre} · {Runtime}분";
+        string token = RequireSecret("TMDB_READ_ACCESS_TOKEN", "TMDB API Read Access Token");
+        return (await new TmdbApiClient(token).GetNowPlayingAsync()).ToList();
+    }
+
+    private async Task<List<Movie>> LoadKobisMoviesAsync()
+    {
+        string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
+        DateTime requestedDate = BoxOfficeDatePicker.SelectedDate ?? DateTime.Today.AddDays(-1);
+        KobisBoxOfficeResult result = await new KobisApiClient(kobisKey)
+            .GetLatestDailyBoxOfficeAsync(requestedDate);
+        BoxOfficeDatePicker.SelectedDate = result.ShowDate;
+
+        string? tmdbToken = LocalSecrets.Get("TMDB_READ_ACCESS_TOKEN");
+        if (string.IsNullOrWhiteSpace(tmdbToken))
+            return result.Movies.Select(CreateKobisOnlyMovie).ToList();
+
+        var tmdbClient = new TmdbApiClient(tmdbToken);
+        Movie[] enriched = await Task.WhenAll(result.Movies.Select(async kobisMovie =>
+        {
+            try
+            {
+                string? releaseYear = kobisMovie.ReleaseDate.Length >= 4 ? kobisMovie.ReleaseDate[..4] : null;
+                Movie? tmdbMovie = await tmdbClient.FindMovieAsync(kobisMovie.Title, releaseYear);
+                return Merge(kobisMovie, tmdbMovie);
+            }
+            catch
+            {
+                return CreateKobisOnlyMovie(kobisMovie);
+            }
+        }));
+
+        return enriched.OrderBy(movie => movie.Rank).ToList();
+    }
+
+    private static Movie Merge(KobisBoxOfficeMovie kobis, Movie? tmdb)
+    {
+        Movie fallback = tmdb ?? CreateKobisOnlyMovie(kobis);
+        return new Movie
+        {
+            TmdbId = fallback.TmdbId,
+            Title = kobis.Title,
+            OriginalTitle = fallback.OriginalTitle,
+            Genres = fallback.Genres,
+            GenreNames = fallback.GenreNames,
+            Overview = fallback.Overview,
+            ReleaseDate = FormatKobisDate(kobis.ReleaseDate),
+            VoteAverage = fallback.VoteAverage,
+            VoteCount = fallback.VoteCount,
+            PosterUrl = fallback.PosterUrl,
+            KobisMovieCode = kobis.MovieCode,
+            Rank = kobis.Rank,
+            DailyAudience = kobis.DailyAudience,
+            CumulativeAudience = kobis.CumulativeAudience
+        };
+    }
+
+    private static Movie CreateKobisOnlyMovie(KobisBoxOfficeMovie kobis) => new()
+    {
+        Title = kobis.Title,
+        ReleaseDate = FormatKobisDate(kobis.ReleaseDate),
+        Overview = "TMDB에서 일치하는 영화 상세정보를 찾지 못했습니다.",
+        KobisMovieCode = kobis.MovieCode,
+        Rank = kobis.Rank,
+        DailyAudience = kobis.DailyAudience,
+        CumulativeAudience = kobis.CumulativeAudience
+    };
+
+    private static string FormatKobisDate(string value) =>
+        DateTime.TryParseExact(value, ["yyyy-MM-dd", "yyyyMMdd"], CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out DateTime date)
+            ? date.ToString("yyyy.MM.dd")
+            : value;
+
+    private static string RequireSecret(string key, string displayName)
+    {
+        string? value = LocalSecrets.Get(key);
+        if (!string.IsNullOrWhiteSpace(value))
+            return value;
+
+        throw new InvalidOperationException(
+            $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
+    }
+
+    private void FilterChanged(object sender, RoutedEventArgs e) => ApplyFilter();
+
+    private void ApplyFilter()
+    {
+        if (MovieCards is null || GenreBox is null || SearchBox is null || StatusPanel is null)
+            return;
+
+        string query = SearchBox.Text.Trim();
+        string genre = GenreBox.SelectedItem as string ?? "전체";
+        var filtered = movies.Where(movie =>
+                (genre == "전체" || movie.GenreNames.Contains(genre))
+                && (movie.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || movie.OriginalTitle.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || movie.Overview.Contains(query, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        MovieCards.ItemsSource = filtered;
+        ResultLabel.Text = $"총 {filtered.Count}편";
+        StatusPanel.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        StatusMessage.Text = "검색 결과가 없어요. 다른 검색어나 장르를 선택해 보세요.";
+        RetryButton.Visibility = Visibility.Collapsed;
+    }
+
+    private void ResetFilters(object sender, RoutedEventArgs e)
+    {
+        SearchBox.Clear();
+        GenreBox.SelectedIndex = 0;
+    }
+
+    private void ShowMovie(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: Movie movie })
+            return;
+
+        string identifiers = movie.Rank > 0
+            ? $"KOBIS 영화 코드: {movie.KobisMovieCode}\nTMDB 영화 ID: {(movie.TmdbId == 0 ? "연결 안 됨" : movie.TmdbId)}"
+            : $"TMDB 영화 ID: {movie.TmdbId}";
+        MessageBox.Show(this, $"{movie.BoxOfficeLabel}\n{movie.Metadata}\n\n{movie.Overview}\n\n{identifiers}",
+            movie.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void ShowStatus(string message, bool canRetry = false)
+    {
+        MovieCards.ItemsSource = null;
+        ResultLabel.Text = "";
+        StatusMessage.Text = message;
+        StatusPanel.Visibility = Visibility.Visible;
+        RetryButton.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
     }
 }
