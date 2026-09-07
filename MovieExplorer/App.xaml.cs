@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace MovieBooking
+namespace MovieExplorer
 {
     /// <summary>
     /// Interaction logic for App.xaml

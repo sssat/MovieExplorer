@@ -1,7 +1,7 @@
-﻿<Application x:Class="MovieBooking.App"
+<Application x:Class="MovieExplorer.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:MovieBooking"
+             xmlns:local="clr-namespace:MovieExplorer"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
          
