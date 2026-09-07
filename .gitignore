@@ -1,0 +1,25 @@
+# Visual Studio user settings
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+# Build and test output
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.nupkg
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+# Local database files and backups
+*.mdf
+*.ldf
+*.ndf
+*.bak
