@@ -33,31 +33,26 @@
             <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="220"/>
                         <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,16,0">
-                        <TextBlock Text="목록" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SourceBox" SelectionChanged="SourceChanged" Padding="8" FontSize="14"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="기준 날짜" Margin="0,0,0,8"/>
                         <DatePicker x:Name="BoxOfficeDatePicker" Padding="5" FontSize="14"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
                         <TextBox x:Name="SearchBox" TextChanged="FilterChanged" Padding="10,8" FontSize="14"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="3" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
                         <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <Button Grid.Column="4" Content="초기화" Click="ResetFilters" VerticalAlignment="Bottom" Margin="0,0,10,0"/>
-                    <Button Grid.Column="5" Content="조회" Click="RefreshMovies" VerticalAlignment="Bottom"/>
+                    <Button Grid.Column="3" Content="초기화" Click="ResetFilters" VerticalAlignment="Bottom" Margin="0,0,10,0"/>
+                    <Button Grid.Column="4" Content="조회" Click="RefreshMovies" VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
             <DockPanel Margin="0,0,0,16">

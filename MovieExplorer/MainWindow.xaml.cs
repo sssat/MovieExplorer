@@ -10,17 +10,11 @@ namespace MovieExplorer;
 
 public partial class MainWindow : Window
 {
-    private const string KobisSource = "국내 박스오피스 (KOBIS)";
-    private const string TmdbSource = "한국 지역 상영 중 (TMDB)";
-
     private List<Movie> movies = [];
-    private bool windowLoaded;
 
     public MainWindow()
     {
         InitializeComponent();
-        SourceBox.ItemsSource = new[] { KobisSource, TmdbSource };
-        SourceBox.SelectedIndex = 0;
         BoxOfficeDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
@@ -28,34 +22,17 @@ public partial class MainWindow : Window
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        windowLoaded = true;
         await LoadMoviesAsync();
     }
 
     private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
-
-    private async void SourceChanged(object sender, SelectionChangedEventArgs e)
-    {
-        bool isKobis = SourceBox.SelectedItem as string == KobisSource;
-        BoxOfficeDatePicker.Visibility = isKobis ? Visibility.Visible : Visibility.Hidden;
-        PageEyebrow.Text = isKobis ? "DAILY BOX OFFICE IN KOREA" : "NOW PLAYING IN KOREA";
-        PageTitle.Text = isKobis ? "국내 일별 박스오피스" : "한국 지역 상영 중";
-        PageDescription.Text = isKobis
-            ? "KOBIS 관객 수 순위와 TMDB 영화 정보를 함께 보여줍니다."
-            : "TMDB의 한국 지역 개봉 정보를 기준으로 영화를 보여줍니다.";
-
-        if (windowLoaded)
-            await LoadMoviesAsync();
-    }
 
     private async Task LoadMoviesAsync()
     {
         ShowStatus("영화 정보를 불러오는 중입니다…");
         try
         {
-            movies = SourceBox.SelectedItem as string == KobisSource
-                ? await LoadKobisMoviesAsync()
-                : await LoadTmdbMoviesAsync();
+            movies = await LoadKobisMoviesAsync();
 
             GenreBox.ItemsSource = new[] { "전체" }
                 .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name));
@@ -74,12 +51,6 @@ public partial class MainWindow : Window
         {
             ShowStatus(exception.Message, true);
         }
-    }
-
-    private async Task<List<Movie>> LoadTmdbMoviesAsync()
-    {
-        string token = RequireSecret("TMDB_READ_ACCESS_TOKEN", "TMDB API Read Access Token");
-        return (await new TmdbApiClient(token).GetNowPlayingAsync()).ToList();
     }
 
     private async Task<List<Movie>> LoadKobisMoviesAsync()
