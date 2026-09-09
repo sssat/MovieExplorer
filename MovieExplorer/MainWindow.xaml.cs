@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using MovieExplorer.Configuration;
 using MovieExplorer.Models;
 using MovieExplorer.Services;
@@ -10,11 +11,15 @@ namespace MovieExplorer;
 
 public partial class MainWindow : Window
 {
+    private readonly BoxOfficeSyncRepository boxOfficeSyncRepository =
+        new(DatabaseSettings.ConnectionString);
     private List<Movie> movies = [];
 
     public MainWindow()
     {
         InitializeComponent();
+        UpcomingPage.MovieSelected += ShowUpcomingMovieDetail;
+        MovieDetailPage.BackRequested += ReturnFromMovieDetail;
         BoxOfficeDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
@@ -27,9 +32,39 @@ public partial class MainWindow : Window
 
     private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
 
+    private void ShowBoxOfficePage(object sender, RoutedEventArgs e)
+    {
+        BoxOfficeHeaderPanel.Visibility = Visibility.Visible;
+        BoxOfficeContentPanel.Visibility = Visibility.Visible;
+        BoxOfficeFooter.Visibility = Visibility.Visible;
+        UpcomingPage.Visibility = Visibility.Collapsed;
+        MovieDetailPage.Visibility = Visibility.Collapsed;
+        SetActiveNavigation(BoxOfficeNavButton);
+    }
+
+    private async void ShowUpcomingPage(object sender, RoutedEventArgs e)
+    {
+        BoxOfficeHeaderPanel.Visibility = Visibility.Collapsed;
+        BoxOfficeContentPanel.Visibility = Visibility.Collapsed;
+        BoxOfficeFooter.Visibility = Visibility.Collapsed;
+        UpcomingPage.Visibility = Visibility.Visible;
+        MovieDetailPage.Visibility = Visibility.Collapsed;
+        SetActiveNavigation(UpcomingNavButton);
+        await UpcomingPage.EnsureLoadedAsync();
+    }
+
+    private void SetActiveNavigation(Button activeButton)
+    {
+        BoxOfficeNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
+        UpcomingNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
+        activeButton.Foreground = new SolidColorBrush(Color.FromRgb(221, 246, 107));
+    }
+
     private async Task LoadMoviesAsync()
     {
         ShowStatus("영화 정보를 불러오는 중입니다…");
+        SyncStatusLabel.Text = "DB 동기화 대기…";
+        SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         try
         {
             movies = await LoadKobisMoviesAsync();
@@ -62,25 +97,51 @@ public partial class MainWindow : Window
         BoxOfficeDatePicker.SelectedDate = result.ShowDate;
 
         string? tmdbToken = LocalSecrets.Get("TMDB_READ_ACCESS_TOKEN");
+        List<Movie> enrichedMovies;
         if (string.IsNullOrWhiteSpace(tmdbToken))
-            return result.Movies.Select(CreateKobisOnlyMovie).ToList();
-
-        var tmdbClient = new TmdbApiClient(tmdbToken);
-        Movie[] enriched = await Task.WhenAll(result.Movies.Select(async kobisMovie =>
         {
-            try
+            enrichedMovies = result.Movies.Select(CreateKobisOnlyMovie).ToList();
+        }
+        else
+        {
+            var tmdbClient = new TmdbApiClient(tmdbToken);
+            Movie[] enriched = await Task.WhenAll(result.Movies.Select(async kobisMovie =>
             {
-                string? releaseYear = kobisMovie.ReleaseDate.Length >= 4 ? kobisMovie.ReleaseDate[..4] : null;
-                Movie? tmdbMovie = await tmdbClient.FindMovieAsync(kobisMovie.Title, releaseYear);
-                return Merge(kobisMovie, tmdbMovie);
-            }
-            catch
-            {
-                return CreateKobisOnlyMovie(kobisMovie);
-            }
-        }));
+                try
+                {
+                    string? releaseYear = kobisMovie.ReleaseDate.Length >= 4 ? kobisMovie.ReleaseDate[..4] : null;
+                    Movie? tmdbMovie = await tmdbClient.FindMovieAsync(kobisMovie.Title, releaseYear);
+                    return Merge(kobisMovie, tmdbMovie);
+                }
+                catch
+                {
+                    return CreateKobisOnlyMovie(kobisMovie);
+                }
+            }));
+            enrichedMovies = enriched.OrderBy(movie => movie.Rank).ToList();
+        }
 
-        return enriched.OrderBy(movie => movie.Rank).ToList();
+        await SynchronizeBoxOfficeAsync(result.ShowDate, enrichedMovies);
+        return enrichedMovies;
+    }
+
+    private async Task SynchronizeBoxOfficeAsync(DateTime showDate, IReadOnlyList<Movie> loadedMovies)
+    {
+        SyncStatusLabel.Text = "MSSQL 동기화 중…";
+        SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
+
+        try
+        {
+            BoxOfficeSyncResult result = await boxOfficeSyncRepository.SyncAsync(showDate, loadedMovies);
+            SyncStatusLabel.Text = $"DB 동기화 · 신규 {result.InsertedCount} / 갱신 {result.UpdatedCount}";
+            SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(221, 246, 107));
+        }
+        catch (Exception exception)
+        {
+            SyncStatusLabel.Text = $"DB 동기화 실패 · {exception.Message}";
+            SyncStatusLabel.ToolTip = exception.ToString();
+            SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(255, 143, 143));
+        }
     }
 
     private static Movie Merge(KobisBoxOfficeMovie kobis, Movie? tmdb)
@@ -161,16 +222,45 @@ public partial class MainWindow : Window
         GenreBox.SelectedIndex = 0;
     }
 
-    private void ShowMovie(object sender, RoutedEventArgs e)
+    private async void ShowMovie(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: Movie movie })
             return;
 
-        string identifiers = movie.Rank > 0
-            ? $"KOBIS 영화 코드: {movie.KobisMovieCode}\nTMDB 영화 ID: {(movie.TmdbId == 0 ? "연결 안 됨" : movie.TmdbId)}"
-            : $"TMDB 영화 ID: {movie.TmdbId}";
-        MessageBox.Show(this, $"{movie.BoxOfficeLabel}\n{movie.Metadata}\n\n{movie.Overview}\n\n{identifiers}",
-            movie.Title, MessageBoxButton.OK, MessageBoxImage.Information);
+        await OpenMovieDetailAsync(movie, false);
+    }
+
+    private async void ShowUpcomingMovieDetail(object? sender, Movie movie) =>
+        await OpenMovieDetailAsync(movie, true);
+
+    private bool returnToUpcomingPage;
+
+    private async Task OpenMovieDetailAsync(Movie movie, bool fromUpcomingPage)
+    {
+        returnToUpcomingPage = fromUpcomingPage;
+        BoxOfficeHeaderPanel.Visibility = Visibility.Collapsed;
+        BoxOfficeContentPanel.Visibility = Visibility.Collapsed;
+        BoxOfficeFooter.Visibility = Visibility.Collapsed;
+        UpcomingPage.Visibility = Visibility.Collapsed;
+        MovieDetailPage.Visibility = Visibility.Visible;
+        await MovieDetailPage.ShowMovieAsync(movie);
+    }
+
+    private void ReturnFromMovieDetail(object? sender, EventArgs e)
+    {
+        MovieDetailPage.Visibility = Visibility.Collapsed;
+
+        if (returnToUpcomingPage)
+        {
+            UpcomingPage.Visibility = Visibility.Visible;
+            SetActiveNavigation(UpcomingNavButton);
+            return;
+        }
+
+        BoxOfficeHeaderPanel.Visibility = Visibility.Visible;
+        BoxOfficeContentPanel.Visibility = Visibility.Visible;
+        BoxOfficeFooter.Visibility = Visibility.Visible;
+        SetActiveNavigation(BoxOfficeNavButton);
     }
 
     private void ShowStatus(string message, bool canRetry = false)

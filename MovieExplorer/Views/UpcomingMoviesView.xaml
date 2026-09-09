@@ -1,0 +1,96 @@
+<UserControl x:Class="MovieExplorer.Views.UpcomingMoviesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent" Foreground="White">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="UPCOMING MOVIES IN KOREA" Foreground="#DDF66B" FontSize="12"/>
+            <TextBlock Text="개봉 예정 영화" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
+            <TextBlock Text="KOBIS 개봉일을 기준으로 향후 6개월 내 개봉 예정 장편 영화를 보여줍니다."
+                       Foreground="#A3AAB9"/>
+
+            <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
+                        <TextBox x:Name="SearchBox" TextChanged="FilterChanged" Padding="10,8" FontSize="14"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="장르" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Content="초기화" Click="ResetFilters"
+                            VerticalAlignment="Bottom" Margin="0,0,10,0"/>
+                    <Button Grid.Column="3" Content="새로고침" Click="RefreshMovies"
+                            VerticalAlignment="Bottom"/>
+                </Grid>
+            </Border>
+
+            <DockPanel Margin="0,0,0,16">
+                <TextBlock Text="개봉 예정작 둘러보기" FontSize="20" FontWeight="Bold"/>
+                <TextBlock x:Name="ResultLabel" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
+            </DockPanel>
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl x:Name="MovieCards">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="238" Margin="0,0,18,22" Background="#1B1F28" CornerRadius="12">
+                                <StackPanel>
+                                    <Border Height="320" Background="#292F3A" CornerRadius="12,12,0,0">
+                                        <Grid ClipToBounds="True">
+                                            <TextBlock Text="포스터 없음" HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" Foreground="#8992A3"/>
+                                            <Image Source="{Binding PosterUrl}" Stretch="UniformToFill"/>
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Margin="16">
+                                        <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Metadata}" Foreground="#A3AAB9" FontSize="12"
+                                                   Margin="0,8,0,10" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Overview}" Height="42" TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis" FontSize="12" Foreground="#C2C7D1"/>
+                                        <Button Content="영화 정보 보기  →" Margin="0,16,0,0"
+                                                Click="ShowMovie" Tag="{Binding}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock x:Name="StatusMessage" Text="개봉 예정 영화를 불러오는 중입니다…"
+                           TextAlignment="Center" Foreground="#A3AAB9" FontSize="16"
+                           TextWrapping="Wrap" MaxWidth="620"/>
+                <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshMovies"
+                        Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Grid.Row="2" Text="개봉 예정 목록·개봉일은 KOBIS, 포스터·줄거리·평점은 TMDB에서 제공합니다."
+                   Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
+    </Grid>
+</UserControl>

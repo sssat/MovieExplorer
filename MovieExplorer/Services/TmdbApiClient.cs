@@ -28,9 +28,12 @@ public sealed class TmdbApiClient
     public TmdbApiClient(string accessToken) => this.accessToken = accessToken;
 
     public async Task<IReadOnlyList<Movie>> GetNowPlayingAsync(CancellationToken cancellationToken = default)
+        => await GetMovieListAsync("movie/now_playing?language=ko-KR&region=KR&page=1", cancellationToken);
+
+    private async Task<IReadOnlyList<Movie>> GetMovieListAsync(
+        string url, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, "movie/now_playing?language=ko-KR&region=KR&page=1");
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
