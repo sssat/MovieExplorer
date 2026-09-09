@@ -24,11 +24,25 @@ BEGIN
         OriginalTitle nvarchar(200) NULL,
         ReleaseDate date NULL,
         PosterUrl nvarchar(500) NULL,
+        Genres nvarchar(300) NULL,
+        Overview nvarchar(max) NULL,
+        VoteAverage decimal(3,1) NULL,
+        VoteCount int NULL,
         CreatedAt datetime2(0) NOT NULL CONSTRAINT DF_Movies_CreatedAt DEFAULT SYSUTCDATETIME(),
         UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_Movies_UpdatedAt DEFAULT SYSUTCDATETIME()
     );
 
 END;
+GO
+
+IF COL_LENGTH(N'dbo.Movies', N'Genres') IS NULL
+    ALTER TABLE dbo.Movies ADD Genres nvarchar(300) NULL;
+IF COL_LENGTH(N'dbo.Movies', N'Overview') IS NULL
+    ALTER TABLE dbo.Movies ADD Overview nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.Movies', N'VoteAverage') IS NULL
+    ALTER TABLE dbo.Movies ADD VoteAverage decimal(3,1) NULL;
+IF COL_LENGTH(N'dbo.Movies', N'VoteCount') IS NULL
+    ALTER TABLE dbo.Movies ADD VoteCount int NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.Movies') AND name = N'UX_Movies_KobisMovieCode')

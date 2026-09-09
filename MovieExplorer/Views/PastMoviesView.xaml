@@ -1,4 +1,4 @@
-<UserControl x:Class="MovieExplorer.Views.UpcomingMoviesView"
+<UserControl x:Class="MovieExplorer.Views.PastMoviesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:MovieExplorer.Views"
@@ -11,42 +11,52 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="UPCOMING MOVIES IN KOREA" Foreground="#DDF66B" FontSize="12"/>
-            <TextBlock Text="개봉 예정 영화" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
-            <TextBlock Text="KOBIS 개봉일을 기준으로 향후 6개월 내 개봉 예정 장편 영화를 보여줍니다."
+            <TextBlock Text="PAST RELEASES IN KOREA" Foreground="#DDF66B" FontSize="12"/>
+            <TextBlock Text="지난 영화" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
+            <TextBlock Text="KOBIS 개봉일을 기준으로 과거에 개봉한 장편 영화를 찾아봅니다."
                        Foreground="#A3AAB9"/>
 
             <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
                 <Grid>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="145"/>
+                        <ColumnDefinition Width="145"/>
                         <ColumnDefinition Width="2*"/>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="135"/>
+                        <ColumnDefinition Width="135"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="시작일" Margin="0,0,0,8"/>
+                        <DatePicker x:Name="FromDatePicker" Padding="5" FontSize="13"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="종료일" Margin="0,0,0,8"/>
+                        <DatePicker x:Name="ToDatePicker" Padding="5" FontSize="13"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="0,0,12,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
                         <TextBox x:Name="SearchBox" TextChanged="FilterChanged" Padding="10,8" FontSize="14"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="3" Margin="0,0,12,0">
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                        <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="13"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                    <StackPanel Grid.Column="4" Margin="0,0,12,0">
                         <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                        <ComboBox x:Name="SortBox" SelectionChanged="FilterChanged" Padding="8" FontSize="13"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="초기화" Click="ResetFilters"
+                    <Button Grid.Column="5" Content="초기화" Click="ResetFilters"
                             VerticalAlignment="Bottom" Margin="0,0,10,0"/>
-                    <Button Grid.Column="4" Content="새로고침" Click="RefreshMovies"
+                    <Button Grid.Column="6" Content="조회" Click="RefreshMovies"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
 
             <DockPanel Margin="0,0,0,16">
-                <TextBlock Text="개봉 예정작 둘러보기" FontSize="20" FontWeight="Bold"/>
+                <TextBlock Text="과거 개봉작 둘러보기" FontSize="20" FontWeight="Bold"/>
                 <TextBlock x:Name="ResultLabel" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
             </DockPanel>
         </StackPanel>
@@ -60,9 +70,7 @@
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl x:Name="MovieCards">
                     <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -93,7 +101,7 @@
             </ScrollViewer>
 
             <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusMessage" Text="개봉 예정 영화를 불러오는 중입니다…"
+                <TextBlock x:Name="StatusMessage" Text="지난 영화를 불러오는 중입니다…"
                            TextAlignment="Center" Foreground="#A3AAB9" FontSize="16"
                            TextWrapping="Wrap" MaxWidth="620"/>
                 <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshMovies"
@@ -102,7 +110,7 @@
             <local:PaginationControl x:Name="Pagination" Grid.Row="1"/>
         </Grid>
 
-        <TextBlock Grid.Row="2" Text="개봉 예정 목록·개봉일은 KOBIS, 포스터·줄거리·평점은 TMDB에서 제공합니다."
+        <TextBlock Grid.Row="2" Text="개봉 목록·개봉일은 KOBIS, 포스터·줄거리·평점은 TMDB에서 제공합니다."
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
     </Grid>
 </UserControl>

@@ -38,6 +38,10 @@
                         Foreground="#DDF66B" Style="{StaticResource NavigationButtonStyle}"/>
                 <Button x:Name="UpcomingNavButton" Content="개봉 예정" Click="ShowUpcomingPage"
                         Style="{StaticResource NavigationButtonStyle}"/>
+                <Button x:Name="PastNavButton" Content="지난 영화" Click="ShowPastPage"
+                        Style="{StaticResource NavigationButtonStyle}"/>
+                <Button x:Name="FavoritesNavButton" Content="관심 영화" Click="ShowFavoritesPage"
+                        Style="{StaticResource NavigationButtonStyle}"/>
             </StackPanel>
         </DockPanel>
 
@@ -51,6 +55,7 @@
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="140"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -66,8 +71,12 @@
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
                         <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="초기화" Click="ResetFilters" VerticalAlignment="Bottom" Margin="0,0,10,0"/>
-                    <Button Grid.Column="4" Content="조회" Click="RefreshMovies" VerticalAlignment="Bottom"/>
+                    <StackPanel Grid.Column="3" Margin="0,0,16,0">
+                        <TextBlock Text="정렬" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="SortBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                    </StackPanel>
+                    <Button Grid.Column="4" Content="초기화" Click="ResetFilters" VerticalAlignment="Bottom" Margin="0,0,10,0"/>
+                    <Button Grid.Column="5" Content="조회" Click="RefreshMovies" VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
             <DockPanel Margin="0,0,0,16">
@@ -80,7 +89,12 @@
         </StackPanel>
 
         <Grid x:Name="BoxOfficeContentPanel" Grid.Row="2">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <ScrollViewer x:Name="BoxOfficeScrollViewer" Grid.Row="0"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <ItemsControl x:Name="MovieCards">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -115,12 +129,17 @@
                 <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshMovies" Visibility="Collapsed"
                         HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
+            <views:PaginationControl x:Name="BoxOfficePagination" Grid.Row="1"/>
         </Grid>
 
         <TextBlock x:Name="BoxOfficeFooter" Grid.Row="3" Text="박스오피스·관객 수는 KOBIS, 영화 정보·이미지·평점은 TMDB에서 제공합니다."
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
 
         <views:UpcomingMoviesView x:Name="UpcomingPage" Grid.Row="1" Grid.RowSpan="3"
+                                  Visibility="Collapsed"/>
+        <views:PastMoviesView x:Name="PastPage" Grid.Row="1" Grid.RowSpan="3"
+                              Visibility="Collapsed"/>
+        <views:FavoriteMoviesView x:Name="FavoritesPage" Grid.Row="1" Grid.RowSpan="3"
                                   Visibility="Collapsed"/>
         <views:MovieDetailView x:Name="MovieDetailPage" Grid.Row="1" Grid.RowSpan="3"
                                Visibility="Collapsed"/>

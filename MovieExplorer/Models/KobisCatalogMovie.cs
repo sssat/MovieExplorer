@@ -1,6 +1,6 @@
 namespace MovieExplorer.Models;
 
-public sealed class KobisUpcomingMovie
+public sealed class KobisCatalogMovie
 {
     public string MovieCode { get; init; } = "";
     public string Title { get; init; } = "";

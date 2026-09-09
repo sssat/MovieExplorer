@@ -32,21 +32,40 @@ public sealed class KobisApiClient
         throw new InvalidOperationException("선택한 날짜 이전 7일 동안 KOBIS 박스오피스 데이터가 없습니다.");
     }
 
-    public async Task<IReadOnlyList<KobisUpcomingMovie>> GetUpcomingMoviesAsync(
+    public Task<IReadOnlyList<KobisCatalogMovie>> GetUpcomingMoviesAsync(
         DateTime fromDate,
         DateTime toDate,
-        int maximumCount = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var collected = new List<KobisUpcomingMovie>();
+        int maximumCount = 100,
+        CancellationToken cancellationToken = default) =>
+        GetCatalogMoviesAsync(fromDate, toDate, "개봉예정", maximumCount, false, cancellationToken);
 
-        for (int page = 1; page <= 10 && collected.Count < maximumCount; page++)
+    public Task<IReadOnlyList<KobisCatalogMovie>> GetPastMoviesAsync(
+        DateTime fromDate,
+        DateTime toDate,
+        int maximumCount = 200,
+        CancellationToken cancellationToken = default) =>
+        GetCatalogMoviesAsync(fromDate, toDate, "개봉", maximumCount, true, cancellationToken);
+
+    private async Task<IReadOnlyList<KobisCatalogMovie>> GetCatalogMoviesAsync(
+        DateTime fromDate,
+        DateTime toDate,
+        string productionStatus,
+        int maximumCount,
+        bool newestFirst,
+        CancellationToken cancellationToken)
+    {
+        var collected = new List<KobisCatalogMovie>();
+
+        const int itemCountPerRequest = 100;
+        const int maximumApiPages = 50;
+
+        for (int page = 1; page <= maximumApiPages && collected.Count < maximumCount; page++)
         {
             string startYear = fromDate.ToString("yyyy", CultureInfo.InvariantCulture);
             string endYear = toDate.ToString("yyyy", CultureInfo.InvariantCulture);
             string url = "movie/searchMovieList.json" +
                          $"?key={Uri.EscapeDataString(apiKey)}" +
-                         $"&curPage={page}&itemPerPage=100" +
+                         $"&curPage={page}&itemPerPage={itemCountPerRequest}" +
                          $"&openStartDt={startYear}&openEndDt={endYear}";
 
             using var response = await HttpClient.GetAsync(url, cancellationToken);
@@ -63,12 +82,12 @@ public sealed class KobisApiClient
                 break;
 
             collected.AddRange(items
-                .Where(item => item.ProductionStatus == "개봉예정"
+                .Where(item => item.ProductionStatus == productionStatus
                                && item.TypeName == "장편"
                                && TryParseKobisDate(item.OpenDate, out DateTime releaseDate)
                                && releaseDate.Date >= fromDate.Date
                                && releaseDate.Date <= toDate.Date)
-                .Select(item => new KobisUpcomingMovie
+                .Select(item => new KobisCatalogMovie
                 {
                     MovieCode = item.MovieCode,
                     Title = item.MovieName,
@@ -82,17 +101,22 @@ public sealed class KobisApiClient
                 }));
 
             int totalCount = payload?.MovieListResult?.TotalCount ?? 0;
-            if (page * 100 >= totalCount)
+            if (page * itemCountPerRequest >= totalCount)
                 break;
         }
 
-        return collected
+        IEnumerable<KobisCatalogMovie> distinctMovies = collected
             .Where(movie => TryParseKobisDate(movie.ReleaseDate, out DateTime releaseDate)
                             && releaseDate.Date >= fromDate.Date
                             && releaseDate.Date <= toDate.Date)
             .GroupBy(movie => movie.MovieCode)
-            .Select(group => group.First())
-            .OrderBy(movie => movie.ReleaseDate)
+            .Select(group => group.First());
+
+        distinctMovies = newestFirst
+            ? distinctMovies.OrderByDescending(movie => movie.ReleaseDate)
+            : distinctMovies.OrderBy(movie => movie.ReleaseDate);
+
+        return distinctMovies
             .Take(maximumCount)
             .ToList();
     }

@@ -26,11 +26,12 @@ KOBIS 국내 일별 박스오피스 TOP 10에 TMDB의 영화 정보를 결합하
 | 국내 박스오피스 | KOBIS 일별 TOP 10 및 관객 수 조회 | 구현 완료 |
 | 데이터 결합 | KOBIS TOP 10에 TMDB 포스터·줄거리·평점·장르 연결 | 구현 완료 |
 | 영화 탐색 | 제목·줄거리 검색, 장르 필터 | 구현 완료 |
+| 페이지 이동·정렬 | 목록별 10편 페이지 이동 및 화면별 정렬·평점 필터 | 구현 완료 |
 | 예외 처리 | 로딩, 빈 결과, 인증 정보 누락, API 오류 표시 | 구현 완료 |
-| 개봉 예정 영화 | KOBIS에서 향후 6개월 내 개봉 예정 장편 조회 | 구현 완료 |
-| 지난 영화 | 과거 개봉 영화를 조건별로 조회 | 개발 예정 |
+| 개봉 예정 영화 | KOBIS에서 향후 6개월 내 개봉 예정 장편을 최대 100편 조회 | 구현 완료 |
+| 지난 영화 | KOBIS 기간별 과거 개봉 장편을 최대 200편 조회하고 TMDB 정보 결합 | 구현 완료 |
 | 영화 상세 | 포스터·개봉일·평점·장르·줄거리·흥행 정보 화면 | 구현 완료 |
-| 관심 영화·감상 기록 | 관심 여부, 1~5점 개인 평점, 감상평 MSSQL 저장 | 구현 완료 |
+| 관심 영화·감상 기록 | 관심 여부, 1~5점 개인 평점, 감상평 저장 및 관심 영화 모아보기 | 구현 완료 |
 | 데이터 동기화 | KOBIS·TMDB 결합 결과를 MSSQL에 중복 없이 Upsert | 구현 완료 |
 | 박스오피스 통계 | 기간별 관객 수와 순위 변동 분석 | 개발 예정 |
 | 데이터 시각화 | 분석 결과를 선·막대 차트와 요약 지표로 표시 | 개발 예정 |
@@ -73,9 +74,10 @@ KOBIS 공식 Open API에는 포스터가 없기 때문에 영화 제목과 개�
 - 국내 일별 박스오피스
 - 국내 일별 박스오피스 영화 상세정보
 - KOBIS 개봉 예정 영화
-- 지난 영화
+- 기간별 지난 영화 조회·검색 및 상세정보
 - 영화 검색 및 상세정보
 - 관심 영화 및 개인 감상 기록
+- 관심 영화 검색 및 모아보기
 - 기간별 박스오피스 통계
 - 영화별 관객 수·순위 변화 차트
 
@@ -173,6 +175,8 @@ MovieExplorer/
 - .NET 9 SDK
 - Microsoft SQL Server 2022 이상(Windows 인증)
 
+로컬 SQL Server를 직접 설치하는 대신 Docker Desktop과 Docker Compose를 사용할 수 있습니다.
+
 ### 2. API 인증 설정
 
 `MovieExplorer/.env.example`을 `MovieExplorer/.env`로 복사한 뒤 발급받은 인증 정보를 입력합니다.
@@ -187,7 +191,35 @@ MOVIEEXPLORER_DB_CONNECTION=Server=localhost;Database=MovieExplorer;Trusted_Conn
 
 DB 연결 문자열을 생략하면 위의 로컬 기본값을 사용합니다. 앱에서 최초 DB 기능을 실행할 때 `MovieExplorer` 데이터베이스와 필요한 테이블을 자동 생성합니다. 수동으로 구성하려면 `Database/001_CreateMovieJournal.sql`을 실행할 수 있습니다.
 
-### 3. 프로그램 실행
+### 3. Docker로 MSSQL 실행하기 (선택)
+
+현재 PC의 로컬 SQL Server와 포트가 겹치지 않도록 Docker SQL Server는 `localhost,14330`을 사용합니다.
+
+1. 저장소 루트의 `.env.docker.example`을 `.env.docker`로 복사합니다.
+2. `.env.docker`의 `MSSQL_SA_PASSWORD`를 본인만 사용할 강력한 비밀번호로 변경합니다.
+3. 다음 명령으로 컨테이너를 실행합니다.
+
+```powershell
+Copy-Item .env.docker.example .env.docker
+docker compose --env-file .env.docker up -d
+docker compose ps
+```
+
+4. `MovieExplorer/.env`의 DB 연결 문자열에 같은 비밀번호를 입력합니다.
+
+```dotenv
+MOVIEEXPLORER_DB_CONNECTION=Server=localhost,14330;Database=MovieExplorer;User Id=sa;Password=본인의_MSSQL_SA_PASSWORD;TrustServerCertificate=True;
+```
+
+컨테이너를 중지할 때는 다음 명령을 사용합니다. 명명된 볼륨은 유지되므로 다시 실행해도 DB 데이터가 남아 있습니다.
+
+```powershell
+docker compose --env-file .env.docker down
+```
+
+Docker DB와 기존 `localhost`의 로컬 DB는 서로 다른 데이터베이스입니다. 기존 로컬 DB 데이터가 Docker로 자동 복사되지는 않습니다.
+
+### 4. 프로그램 실행
 
 1. Visual Studio에서 `MovieExplorer.sln`을 엽니다.
 2. 솔루션을 빌드합니다.
@@ -197,13 +229,14 @@ DB 연결 문자열을 생략하면 위의 로컬 기본값을 사용합니다. 
 
 1. KOBIS·TMDB API 연동 및 박스오피스 목록 구현 — 완료
 2. KOBIS 개봉 예정 목록과 TMDB 부가정보 결합 화면 구현 — 완료
-3. MSSQL 관심 영화·감상 기록 테이블 및 CRUD 구현 — 완료
-4. KOBIS·TMDB 결합 데이터 Upsert와 동기화 이력 저장 — 완료
-5. DB 데이터를 이용한 영화·기간 조건 조회 구현
-6. SQL 기반 박스오피스 분석 쿼리와 저장 프로시저 구현
-7. 분석 결과 차트·요약 카드·데이터 표 구현
-8. 최소 데이터 관리 화면 구현
-9. 테스트, 쿼리 성능 개선 및 문서화
+3. KOBIS 기간별 지난 영화 조회와 TMDB 부가정보 결합 — 완료
+4. MSSQL 관심 영화·감상 기록 테이블 및 CRUD 구현 — 완료
+5. KOBIS·TMDB 결합 데이터 Upsert와 동기화 이력 저장 — 완료
+6. DB 데이터를 이용한 영화·기간 조건 조회 구현
+7. SQL 기반 박스오피스 분석 쿼리와 저장 프로시저 구현
+8. 분석 결과 차트·요약 카드·데이터 표 구현
+9. 최소 데이터 관리 화면 구현
+10. 테스트, 쿼리 성능 개선 및 문서화
 
 ## 포트폴리오 핵심 내용
 

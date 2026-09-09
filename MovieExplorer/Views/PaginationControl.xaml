@@ -1,0 +1,13 @@
+<UserControl x:Class="MovieExplorer.Views.PaginationControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,8">
+        <Button x:Name="PreviousButton" Content="←  이전" Click="GoPrevious"
+                Padding="18,8" Margin="0,0,14,0"/>
+        <TextBlock x:Name="PageLabel" Foreground="#C2C7D1" VerticalAlignment="Center"
+                   MinWidth="90" TextAlignment="Center"/>
+        <Button x:Name="NextButton" Content="다음  →" Click="GoNext"
+                Padding="18,8" Margin="14,0,0,0"/>
+    </StackPanel>
+</UserControl>

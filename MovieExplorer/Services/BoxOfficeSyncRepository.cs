@@ -84,10 +84,12 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
             IF @MovieId IS NULL
             BEGIN
                 INSERT dbo.Movies
-                    (KobisMovieCode, TmdbId, Title, OriginalTitle, ReleaseDate, PosterUrl)
+                    (KobisMovieCode, TmdbId, Title, OriginalTitle, ReleaseDate, PosterUrl,
+                     Genres, Overview, VoteAverage, VoteCount)
                 VALUES
                     (@KobisMovieCode, NULLIF(@TmdbId, 0), @Title,
-                     NULLIF(@OriginalTitle, ''), @ReleaseDate, @PosterUrl);
+                     NULLIF(@OriginalTitle, ''), @ReleaseDate, @PosterUrl,
+                     @Genres, @Overview, @VoteAverage, @VoteCount);
                 SET @MovieId = SCOPE_IDENTITY();
             END
             ELSE
@@ -98,6 +100,10 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
                     OriginalTitle = NULLIF(@OriginalTitle, ''),
                     ReleaseDate = @ReleaseDate,
                     PosterUrl = @PosterUrl,
+                    Genres = @Genres,
+                    Overview = @Overview,
+                    VoteAverage = @VoteAverage,
+                    VoteCount = @VoteCount,
                     UpdatedAt = SYSUTCDATETIME()
                 WHERE MovieId = @MovieId;
             END;
@@ -192,6 +198,12 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
         command.Parameters.Add("@ReleaseDate", SqlDbType.Date).Value = ParseReleaseDate(movie.ReleaseDate);
         command.Parameters.Add("@PosterUrl", SqlDbType.NVarChar, 500).Value =
             movie.PosterUrl is null ? DBNull.Value : movie.PosterUrl;
+        command.Parameters.Add("@Genres", SqlDbType.NVarChar, 300).Value = movie.Genres;
+        command.Parameters.Add("@Overview", SqlDbType.NVarChar, -1).Value = movie.Overview;
+        command.Parameters.Add("@VoteAverage", SqlDbType.Decimal).Value = movie.VoteAverage;
+        command.Parameters["@VoteAverage"].Precision = 3;
+        command.Parameters["@VoteAverage"].Scale = 1;
+        command.Parameters.Add("@VoteCount", SqlDbType.Int).Value = movie.VoteCount;
     }
 
     private static object ParseReleaseDate(string value)

@@ -1,5 +1,5 @@
-using System.Net.Http;
 using System.Globalization;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using MovieExplorer.Configuration;
@@ -8,22 +8,24 @@ using MovieExplorer.Services;
 
 namespace MovieExplorer.Views;
 
-public partial class UpcomingMoviesView : UserControl
+public partial class PastMoviesView : UserControl
 {
     private const int PageSize = 10;
-    private const int MaximumMovieCount = 100;
-    public event EventHandler<Movie>? MovieSelected;
-
+    private const int MaximumMovieCount = 200;
     private List<Movie> movies = [];
     private bool loaded;
     private int currentPage = 1;
 
-    public UpcomingMoviesView()
+    public event EventHandler<Movie>? MovieSelected;
+
+    public PastMoviesView()
     {
         InitializeComponent();
+        FromDatePicker.SelectedDate = DateTime.Today.AddYears(-1);
+        ToDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
-        SortBox.ItemsSource = new[] { "개봉일 빠른순", "평점 높은순", "제목순" };
+        SortBox.ItemsSource = new[] { "최신 개봉순", "오래된 개봉순", "평점 높은순", "제목순" };
         SortBox.SelectedIndex = 0;
         Pagination.PageChanged += (_, page) =>
         {
@@ -35,30 +37,37 @@ public partial class UpcomingMoviesView : UserControl
 
     public async Task EnsureLoadedAsync()
     {
-        if (loaded)
-            return;
-
-        await LoadMoviesAsync();
+        if (!loaded)
+            await LoadMoviesAsync();
     }
 
     private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
 
     private async Task LoadMoviesAsync()
     {
-        ShowStatus("개봉 예정 영화를 불러오는 중입니다…");
+        DateTime fromDate = FromDatePicker.SelectedDate ?? DateTime.Today.AddYears(-1);
+        DateTime toDate = ToDatePicker.SelectedDate ?? DateTime.Today.AddDays(-1);
+        if (fromDate.Date > toDate.Date)
+        {
+            ShowStatus("시작일은 종료일보다 늦을 수 없습니다.", true);
+            return;
+        }
 
+        if (toDate.Date >= DateTime.Today)
+        {
+            toDate = DateTime.Today.AddDays(-1);
+            ToDatePicker.SelectedDate = toDate;
+        }
+
+        ShowStatus("지난 영화를 불러오는 중입니다…");
         try
         {
             string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
-            var kobisClient = new KobisApiClient(kobisKey);
-            IReadOnlyList<KobisCatalogMovie> upcomingMovies = await kobisClient.GetUpcomingMoviesAsync(
-                DateTime.Today,
-                DateTime.Today.AddMonths(6),
-                MaximumMovieCount);
+            IReadOnlyList<KobisCatalogMovie> kobisMovies = await new KobisApiClient(kobisKey)
+                .GetPastMoviesAsync(fromDate, toDate, MaximumMovieCount);
 
-            movies = await EnrichWithTmdbAsync(upcomingMovies);
+            movies = await EnrichWithTmdbAsync(kobisMovies);
             loaded = true;
-
             GenreBox.ItemsSource = new[] { "전체" }
                 .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name));
             GenreBox.SelectedIndex = 0;
@@ -66,7 +75,7 @@ public partial class UpcomingMoviesView : UserControl
         }
         catch (HttpRequestException exception)
         {
-            ShowStatus($"개봉 예정 영화를 불러오지 못했습니다.\n{exception.Message}", true);
+            ShowStatus($"지난 영화를 불러오지 못했습니다.\n{exception.Message}", true);
         }
         catch (TaskCanceledException)
         {
@@ -108,7 +117,7 @@ public partial class UpcomingMoviesView : UserControl
             }
         }));
 
-        return enriched.OrderBy(movie => movie.ReleaseDate).ToList();
+        return enriched.OrderByDescending(movie => movie.ReleaseDate).ToList();
     }
 
     private static Movie Merge(KobisCatalogMovie kobis, Movie? tmdb)
@@ -136,12 +145,8 @@ public partial class UpcomingMoviesView : UserControl
     }
 
     private static string FormatKobisDate(string value) =>
-        DateTime.TryParseExact(
-            value,
-            ["yyyy-MM-dd", "yyyyMMdd"],
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out DateTime date)
+        DateTime.TryParseExact(value, ["yyyy-MM-dd", "yyyyMMdd"], CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out DateTime date)
             ? date.ToString("yyyy.MM.dd")
             : value;
 
@@ -176,9 +181,10 @@ public partial class UpcomingMoviesView : UserControl
 
         filteredQuery = (SortBox.SelectedItem as string) switch
         {
+            "오래된 개봉순" => filteredQuery.OrderBy(movie => movie.ReleaseDate),
             "평점 높은순" => filteredQuery.OrderByDescending(movie => movie.VoteAverage),
             "제목순" => filteredQuery.OrderBy(movie => movie.Title),
-            _ => filteredQuery.OrderBy(movie => movie.ReleaseDate)
+            _ => filteredQuery.OrderByDescending(movie => movie.ReleaseDate)
         };
 
         List<Movie> filtered = filteredQuery.ToList();
@@ -189,7 +195,9 @@ public partial class UpcomingMoviesView : UserControl
         ResultLabel.Text = $"총 {filtered.Count}편 · {currentPage}/{totalPages} 페이지";
         Pagination.SetState(currentPage, filtered.Count, PageSize);
         StatusPanel.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        StatusMessage.Text = "검색 결과가 없어요. 다른 검색어나 장르를 선택해 보세요.";
+        StatusMessage.Text = movies.Count == 0
+            ? "선택한 기간에 조회된 과거 개봉작이 없습니다."
+            : "검색 결과가 없습니다.";
         RetryButton.Visibility = Visibility.Collapsed;
     }
 
@@ -199,14 +207,14 @@ public partial class UpcomingMoviesView : UserControl
         GenreBox.SelectedIndex = 0;
         SortBox.SelectedIndex = 0;
         currentPage = 1;
+        FromDatePicker.SelectedDate = DateTime.Today.AddYears(-1);
+        ToDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
     }
 
     private void ShowMovie(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: Movie movie })
-            return;
-
-        MovieSelected?.Invoke(this, movie);
+        if (sender is Button { Tag: Movie movie })
+            MovieSelected?.Invoke(this, movie);
     }
 
     private void ShowStatus(string message, bool canRetry = false)
