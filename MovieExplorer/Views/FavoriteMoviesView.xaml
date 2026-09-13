@@ -26,24 +26,24 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="영화 제목 · 감상평 검색" Margin="0,0,0,8"/>
-                        <TextBox x:Name="SearchBox" Padding="10,8" FontSize="14"/>
+                        <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" Padding="10,8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="개인 평점" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="RatingBox" Padding="8" FontSize="14"/>
+                        <ComboBox ItemsSource="{Binding RatingOptions}" SelectedItem="{Binding SelectedRating, Mode=TwoWay}" Padding="8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" Padding="8" FontSize="14"/>
+                        <ComboBox ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSort, Mode=TwoWay}" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="조회" Click="QueryFavorites"
+                    <Button Grid.Column="3" Content="조회" Command="{Binding QueryCommand}"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
 
             <DockPanel Margin="0,0,0,16">
                 <TextBlock Text="내가 저장한 영화" FontSize="20" FontWeight="Bold"/>
-                <TextBlock x:Name="ResultLabel" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
+                <TextBlock Text="{Binding ResultLabel}" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
             </DockPanel>
         </StackPanel>
 
@@ -54,7 +54,7 @@
             </Grid.RowDefinitions>
             <ScrollViewer x:Name="MovieScrollViewer" Grid.Row="0"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="MovieCards">
+                <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -81,7 +81,8 @@
                                         <TextBlock Text="{Binding UpdatedAtLabel}" Foreground="#7F8899"
                                                    FontSize="11" Margin="0,8,0,0"/>
                                         <Button Content="영화 정보 보기  →" Margin="0,14,0,0"
-                                                Click="ShowMovie" Tag="{Binding Movie}"/>
+                                                Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding Movie}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -90,14 +91,20 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusMessage" Text="관심 영화를 불러오는 중입니다…"
+            <StackPanel Visibility="{Binding IsStatusVisible, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}"
                            TextAlignment="Center" Foreground="#A3AAB9" FontSize="16"
                            TextWrapping="Wrap" MaxWidth="620"/>
-                <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshFavorites"
-                        Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                <Button Content="다시 시도" Command="{Binding RefreshCommand}"
+                        Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
-            <local:PaginationControl x:Name="Pagination" Grid.Row="1"/>
+            <local:PaginationControl x:Name="Pagination" Grid.Row="1"
+                                     CurrentPage="{Binding CurrentPage, Mode=TwoWay}"
+                                     TotalItemCount="{Binding TotalItemCount}"
+                                     PageSize="{Binding ItemsPerPage}"
+                                     PageChangedCommand="{Binding ChangePageCommand}"/>
         </Grid>
 
         <TextBlock Grid.Row="2" Text="관심 영화와 나의 평점·감상평은 저장 후 언제든 다시 확인할 수 있습니다."

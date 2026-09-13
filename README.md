@@ -165,6 +165,7 @@ KOBIS에는 포스터와 상세 줄거리가 없으므로 동일 영화를 TMDB�
 | --- | --- |
 | Language | C# |
 | UI | WPF, XAML |
+| Architecture | MVVM, Repository Pattern |
 | Runtime | .NET 9 |
 | Database | Microsoft SQL Server 2022, Microsoft.Data.SqlClient |
 | External Data | KOBIS Open API, TMDB API |
@@ -172,6 +173,8 @@ KOBIS에는 포스터와 상세 줄거리가 없으므로 동일 영화를 TMDB�
 | Version Control | Git, GitHub |
 
 ## 프로젝트 구조
+
+현재 구성 요소와 데이터 흐름은 [시스템 아키텍처](docs/architecture.md)에서 확인할 수 있습니다.
 
 ```text
 MovieExplorer/
@@ -184,12 +187,15 @@ MovieExplorer/
    ├─ Configuration/                    # 인증 정보와 연결 문자열 로드
    ├─ Models/                           # 영화·API 응답·분석 모델
    ├─ Services/                         # API 통신, DB 접근, 동기화·분석
-   ├─ Views/                            # 목록·상세·통계·관리 화면
+   ├─ ViewModels/                       # 화면 상태, Command, 조회·필터 로직
+   ├─ Views/                            # XAML 화면과 UI 전용 렌더링
    ├─ .env.example                      # 애플리케이션 환경 변수 예시
    ├─ App.xaml
    ├─ MainWindow.xaml
    └─ MovieExplorer.csproj
 ```
+
+화면은 `View`의 데이터 바인딩과 `ICommand`를 통해 `ViewModel`과 연결합니다. API 호출과 SQL Server 접근은 ViewModel에서 직접 구현하지 않고 기존 Service·Repository 계층에 위임합니다. Code-behind에는 초기 화면 연결, 스크롤 이동, Canvas 차트 그리기처럼 WPF UI에 종속된 동작만 남겼습니다.
 
 ## 실행 방법
 

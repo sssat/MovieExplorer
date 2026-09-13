@@ -19,54 +19,56 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="시작일" Margin="0,0,0,8"/>
-                        <DatePicker x:Name="FromDatePicker" Padding="5" FontSize="14"/>
+                        <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="종료일" Margin="0,0,0,8"/>
-                        <DatePicker x:Name="ToDatePicker" Padding="5" FontSize="14"/>
+                        <DatePicker SelectedDate="{Binding ToDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="분석할 영화" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="MovieBox" Padding="7" FontSize="14"
-                                  DisplayMemberPath="DisplayLabel"/>
+                        <ComboBox ItemsSource="{Binding MovieOptions}" SelectedItem="{Binding SelectedMovie, Mode=TwoWay}"
+                                  Padding="7" FontSize="14" DisplayMemberPath="DisplayLabel"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="조회" Click="QueryAnalytics"
+                    <Button Grid.Column="3" Content="조회" Command="{Binding QueryCommand}"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
 
-            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" Margin="0,70,0,0">
-                <TextBlock x:Name="StatusMessage" TextAlignment="Center" Foreground="#A3AAB9"
+            <StackPanel Visibility="{Binding IsStatusVisible, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" Margin="0,70,0,0">
+                <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}"
+                           TextAlignment="Center" Foreground="#A3AAB9"
                            FontSize="15" TextWrapping="Wrap" MaxWidth="700"/>
             </StackPanel>
 
-            <StackPanel x:Name="DashboardPanel" Visibility="Collapsed">
-                <TextBlock x:Name="SelectedMovieTitle" FontSize="24" FontWeight="Bold" Margin="0,0,0,16"/>
+            <StackPanel Visibility="{Binding IsDashboardVisible, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding SelectedMovieTitle}" FontSize="24" FontWeight="Bold" Margin="0,0,0,16"/>
 
                 <UniformGrid Columns="4" Margin="0,0,0,20">
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="기간 관객 수" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="PeriodAudienceLabel" FontSize="21" FontWeight="Bold"
+                            <TextBlock Text="{Binding PeriodAudienceLabel}" FontSize="21" FontWeight="Bold"
                                        Foreground="#DDF66B" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="주간 최고 관객 수" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="PeakAudienceLabel" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding PeakAudienceLabel}" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="최고·평균 순위" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="RankSummaryLabel" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding RankSummaryLabel}" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18">
                         <StackPanel>
                             <TextBlock Text="순위 변화" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="RankChangeLabel" FontSize="16" FontWeight="Bold" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding RankChangeLabel}" FontSize="16" FontWeight="Bold" Margin="0,10,0,0"/>
                         </StackPanel>
                     </Border>
                 </UniformGrid>
@@ -75,28 +77,28 @@
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="최근 관객 증감" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="LatestAudienceChangeLabel" FontSize="21" FontWeight="Bold"
+                            <TextBlock Text="{Binding LatestAudienceChangeLabel}" FontSize="21" FontWeight="Bold"
                                        Foreground="#DDF66B" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="TOP 10 진입 기간" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="TopTenDurationLabel" FontSize="21" FontWeight="Bold"
+                            <TextBlock Text="{Binding TopTenDurationLabel}" FontSize="21" FontWeight="Bold"
                                        Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="최고 흥행 주" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="PeakWeekLabel" FontSize="21" FontWeight="Bold"
+                            <TextBlock Text="{Binding PeakWeekLabel}" FontSize="21" FontWeight="Bold"
                                        Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18">
                         <StackPanel>
                             <TextBlock Text="첫 집계 대비 유지율" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="AudienceRetentionLabel" FontSize="21" FontWeight="Bold"
+                            <TextBlock Text="{Binding AudienceRetentionLabel}" FontSize="21" FontWeight="Bold"
                                        Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
@@ -149,7 +151,7 @@
                 <Border Background="#1B1F28" CornerRadius="12" Padding="18">
                     <StackPanel>
                         <TextBlock Text="주차별 관객 기록" FontSize="18" FontWeight="Bold"/>
-                        <TextBlock x:Name="CoverageLabel" Foreground="#8992A3" FontSize="11" Margin="0,4,0,14"/>
+                        <TextBlock Text="{Binding CoverageLabel}" Foreground="#8992A3" FontSize="11" Margin="0,4,0,14"/>
                         <Grid Margin="8,0,8,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -164,7 +166,7 @@
                             <TextBlock Grid.Column="3" Text="직전 집계 대비" Foreground="#A3AAB9"/>
                             <TextBlock Grid.Column="4" Text="누적 관객 수" Foreground="#A3AAB9"/>
                         </Grid>
-                        <ItemsControl x:Name="WeeklyRows">
+                        <ItemsControl ItemsSource="{Binding WeeklyTrend}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="#303642" BorderThickness="0,1,0,0" Padding="8,10">

@@ -4,7 +4,7 @@
         xmlns:views="clr-namespace:MovieExplorer.Views"
         Title="영화 탐색 · MovieExplorer" Height="840" Width="1180" MinWidth="760" MinHeight="600"
         WindowStartupLocation="CenterScreen" Background="#101217" Foreground="White"
-        FontFamily="Malgun Gothic" Loaded="Window_Loaded">
+        FontFamily="Malgun Gothic">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
@@ -22,6 +22,14 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
+        <Style x:Key="ActiveNavigationButtonStyle" TargetType="Button"
+               BasedOn="{StaticResource NavigationButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                    <Setter Property="Foreground" Value="#DDF66B"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
     <Grid Margin="32,20">
         <Grid.RowDefinitions>
@@ -34,22 +42,22 @@
         <DockPanel>
             <TextBlock Text="M / MovieExplorer" FontSize="23" FontWeight="Bold" Foreground="#DDF66B"/>
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                <Button x:Name="BoxOfficeNavButton" Content="박스오피스" Click="ShowBoxOfficePage"
-                        Foreground="#DDF66B" Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="UpcomingNavButton" Content="개봉 예정" Click="ShowUpcomingPage"
-                        Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="PastNavButton" Content="지난 영화" Click="ShowPastPage"
-                        Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="FavoritesNavButton" Content="관심 영화" Click="ShowFavoritesPage"
-                        Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="AnalyticsNavButton" Content="통계" Click="ShowAnalyticsPage"
-                        Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="DataSyncNavButton" Content="정보 관리" Click="ShowDataSyncPage"
-                        Style="{StaticResource NavigationButtonStyle}"/>
+                <Button Content="박스오피스" Command="{Binding NavigateCommand}" CommandParameter="BoxOffice"
+                        Tag="{Binding IsBoxOfficePage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
+                <Button Content="개봉 예정" Command="{Binding NavigateCommand}" CommandParameter="Upcoming"
+                        Tag="{Binding IsUpcomingPage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
+                <Button Content="지난 영화" Command="{Binding NavigateCommand}" CommandParameter="Past"
+                        Tag="{Binding IsPastPage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
+                <Button Content="관심 영화" Command="{Binding NavigateCommand}" CommandParameter="Favorites"
+                        Tag="{Binding IsFavoritesPage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
+                <Button Content="통계" Command="{Binding NavigateCommand}" CommandParameter="Analytics"
+                        Tag="{Binding IsAnalyticsPage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
+                <Button Content="정보 관리" Command="{Binding NavigateCommand}" CommandParameter="DataStatus"
+                        Tag="{Binding IsDataStatusPage}" Style="{StaticResource ActiveNavigationButtonStyle}"/>
             </StackPanel>
         </DockPanel>
 
-        <StackPanel x:Name="BoxOfficeHeaderPanel" Grid.Row="1">
+        <StackPanel Grid.Row="1" Visibility="{Binding IsBoxOfficePage, Converter={StaticResource BoolToVisibility}}">
             <TextBlock x:Name="PageEyebrow" Text="DAILY BOX OFFICE IN KOREA" Foreground="#DDF66B" FontSize="12"/>
             <TextBlock x:Name="PageTitle" Text="국내 박스오피스" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
             <TextBlock x:Name="PageDescription" Text="선택한 날짜에 관객이 많이 찾은 영화와 상세 정보를 한눈에 확인해 보세요." Foreground="#A3AAB9"/>
@@ -64,36 +72,47 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="기준 날짜" Margin="0,0,0,8"/>
-                        <DatePicker x:Name="BoxOfficeDatePicker" Padding="5" FontSize="14"/>
+                        <DatePicker SelectedDate="{Binding BoxOfficeDate, Mode=TwoWay}" Padding="5" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
-                        <TextBox x:Name="SearchBox" Padding="10,8" FontSize="14"/>
+                        <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" Padding="10,8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="GenreBox" Padding="8" FontSize="14"/>
+                        <ComboBox ItemsSource="{Binding Genres}" SelectedItem="{Binding SelectedGenre, Mode=TwoWay}" Padding="8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Margin="0,0,16,0">
                         <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" Padding="8" FontSize="14"/>
+                        <ComboBox ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSort, Mode=TwoWay}" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <Button Grid.Column="4" Content="조회" Click="RefreshMovies" VerticalAlignment="Bottom"/>
+                    <Button Grid.Column="4" Content="조회" Command="{Binding QueryBoxOfficeCommand}" VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
             <DockPanel Margin="0,0,0,16">
                 <TextBlock Text="영화 둘러보기" FontSize="20" FontWeight="Bold"/>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                    <TextBlock x:Name="SyncStatusLabel" Foreground="#A3AAB9" Margin="0,0,18,0"/>
-                    <TextBlock x:Name="ResultLabel" Foreground="#A3AAB9"/>
+                    <TextBlock Text="{Binding SyncStatus}" Margin="0,0,18,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#A3AAB9"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SyncFailed}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF8F8F"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding ResultLabel}" Foreground="#A3AAB9"/>
                 </StackPanel>
             </DockPanel>
         </StackPanel>
 
-        <Grid x:Name="BoxOfficeContentPanel" Grid.Row="2">
+        <Grid Grid.Row="2" Visibility="{Binding IsBoxOfficePage, Converter={StaticResource BoolToVisibility}}">
             <ScrollViewer x:Name="BoxOfficeScrollViewer"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="MovieCards">
+                <ItemsControl ItemsSource="{Binding BoxOfficeMovies}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -112,7 +131,9 @@
                                         <TextBlock Text="{Binding BoxOfficeLabel}" Foreground="#DDF66B" FontWeight="Bold" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding Metadata}" Foreground="#A3AAB9" FontSize="12" Margin="0,8,0,10" TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding Overview}" Height="42" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="#C2C7D1"/>
-                                        <Button Content="영화 정보 보기  →" Margin="0,16,0,0" Click="ShowMovie" Tag="{Binding}"/>
+                                        <Button Content="영화 정보 보기  →" Margin="0,16,0,0"
+                                                Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -121,28 +142,31 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusMessage" Text="영화 정보를 불러오는 중입니다…" TextAlignment="Center"
+            <StackPanel Visibility="{Binding IsStatusVisible, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}" TextAlignment="Center"
                            Foreground="#A3AAB9" FontSize="16" TextWrapping="Wrap" MaxWidth="620"/>
-                <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshMovies" Visibility="Collapsed"
+                <Button Content="다시 시도" Command="{Binding QueryBoxOfficeCommand}"
+                        Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
                         HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
         </Grid>
 
-        <TextBlock x:Name="BoxOfficeFooter" Grid.Row="3" Text="영화 정보 제공: 영화진흥위원회·TMDB"
+        <TextBlock Grid.Row="3" Text="영화 정보 제공: 영화진흥위원회·TMDB"
+                   Visibility="{Binding IsBoxOfficePage, Converter={StaticResource BoolToVisibility}}"
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
 
-        <views:UpcomingMoviesView x:Name="UpcomingPage" Grid.Row="1" Grid.RowSpan="3"
-                                  Visibility="Collapsed"/>
-        <views:PastMoviesView x:Name="PastPage" Grid.Row="1" Grid.RowSpan="3"
-                              Visibility="Collapsed"/>
-        <views:FavoriteMoviesView x:Name="FavoritesPage" Grid.Row="1" Grid.RowSpan="3"
-                                  Visibility="Collapsed"/>
-        <views:DataSyncDashboardView x:Name="DataSyncPage" Grid.Row="1" Grid.RowSpan="3"
-                                     Visibility="Collapsed"/>
-        <views:BoxOfficeAnalyticsView x:Name="AnalyticsPage" Grid.Row="1" Grid.RowSpan="3"
-                                      Visibility="Collapsed"/>
-        <views:MovieDetailView x:Name="MovieDetailPage" Grid.Row="1" Grid.RowSpan="3"
-                               Visibility="Collapsed"/>
+        <views:UpcomingMoviesView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding Upcoming}"
+                                  Visibility="{Binding DataContext.IsUpcomingPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
+        <views:PastMoviesView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding Past}"
+                              Visibility="{Binding DataContext.IsPastPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
+        <views:FavoriteMoviesView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding Favorites}"
+                                  Visibility="{Binding DataContext.IsFavoritesPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
+        <views:DataSyncDashboardView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding DataStatus}"
+                                     Visibility="{Binding DataContext.IsDataStatusPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
+        <views:BoxOfficeAnalyticsView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding Analytics}"
+                                      Visibility="{Binding DataContext.IsAnalyticsPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
+        <views:MovieDetailView Grid.Row="1" Grid.RowSpan="3" DataContext="{Binding Detail}"
+                               Visibility="{Binding DataContext.IsDetailPage, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
     </Grid>
 </Window>

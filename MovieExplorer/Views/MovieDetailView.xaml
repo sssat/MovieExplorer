@@ -10,7 +10,7 @@
         </Grid.RowDefinitions>
 
         <DockPanel Margin="0,0,0,20">
-            <Button Content="←  목록으로" Click="GoBack" HorizontalAlignment="Left"/>
+            <Button Content="←  목록으로" Command="{Binding BackCommand}" HorizontalAlignment="Left"/>
             <TextBlock Text="MOVIE DETAILS" HorizontalAlignment="Right" VerticalAlignment="Center"
                        Foreground="#A3AAB9" FontSize="12"/>
         </DockPanel>
@@ -29,27 +29,27 @@
                         <Grid ClipToBounds="True">
                             <TextBlock Text="포스터 없음" HorizontalAlignment="Center"
                                        VerticalAlignment="Center" Foreground="#8992A3"/>
-                            <Image Source="{Binding PosterUrl}" Stretch="UniformToFill"/>
+                            <Image Source="{Binding Movie.PosterUrl}" Stretch="UniformToFill"/>
                         </Grid>
                     </Border>
 
                     <StackPanel Grid.Column="1">
                         <TextBlock Text="MOVIE INFORMATION" Foreground="#DDF66B" FontSize="12"/>
-                        <TextBlock Text="{Binding Title}" FontSize="34" FontWeight="Bold"
+                        <TextBlock Text="{Binding Movie.Title}" FontSize="34" FontWeight="Bold"
                                    TextWrapping="Wrap" Margin="0,8,0,4"/>
-                        <TextBlock Text="{Binding OriginalTitle}" Foreground="#A3AAB9"
+                        <TextBlock Text="{Binding Movie.OriginalTitle}" Foreground="#A3AAB9"
                                    FontSize="15" TextWrapping="Wrap"/>
 
-                        <TextBlock Text="{Binding BoxOfficeLabel}" Foreground="#DDF66B"
+                        <TextBlock Text="{Binding Movie.BoxOfficeLabel}" Foreground="#DDF66B"
                                    FontWeight="Bold" FontSize="15" TextWrapping="Wrap"
                                    Margin="0,20,0,0"/>
-                        <TextBlock Text="{Binding Metadata}" Foreground="#C2C7D1"
+                        <TextBlock Text="{Binding Movie.Metadata}" Foreground="#C2C7D1"
                                    FontSize="14" TextWrapping="Wrap" Margin="0,10,0,0"/>
 
                         <Separator Margin="0,24" Background="#353B47"/>
 
                         <TextBlock Text="줄거리" FontSize="20" FontWeight="Bold"/>
-                        <TextBlock Text="{Binding Overview}" Foreground="#C2C7D1" FontSize="14"
+                        <TextBlock Text="{Binding Movie.Overview}" Foreground="#C2C7D1" FontSize="14"
                                    TextWrapping="Wrap" LineHeight="24" Margin="0,12,0,0"/>
 
                         <Border Background="#242A34" CornerRadius="8" Padding="20" Margin="0,28,0,0">
@@ -58,26 +58,39 @@
                                 <TextBlock Text="관심 영화로 표시하고 나만의 평점과 감상평을 남겨보세요."
                                            Foreground="#A3AAB9" FontSize="12" Margin="0,5,0,18"/>
 
-                                <CheckBox x:Name="FavoriteCheckBox" Content="관심 영화로 저장"
+                                <CheckBox IsChecked="{Binding IsFavorite, Mode=TwoWay}" Content="관심 영화로 저장"
                                           Foreground="White" FontSize="14" Margin="0,0,0,16"/>
 
                                 <TextBlock Text="개인 평점" FontWeight="Bold"/>
-                                <ComboBox x:Name="PersonalRatingBox" Width="180"
+                                <ComboBox ItemsSource="{Binding RatingOptions}" SelectedItem="{Binding SelectedRating, Mode=TwoWay}"
+                                          DisplayMemberPath="Label" Width="180"
                                           HorizontalAlignment="Left" Margin="0,8,0,16"/>
 
                                 <TextBlock Text="감상평" FontWeight="Bold"/>
-                                <TextBox x:Name="ReviewTextBox" Height="110" Margin="0,8,0,0"
+                                <TextBox Text="{Binding Review, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Height="110" Margin="0,8,0,0"
                                          Padding="10" AcceptsReturn="True" TextWrapping="Wrap"
                                          VerticalScrollBarVisibility="Auto" MaxLength="2000"/>
                                 <TextBlock Text="최대 2,000자" HorizontalAlignment="Right"
                                            Foreground="#7F8899" FontSize="11" Margin="0,4,0,0"/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                                    <Button x:Name="SaveJournalButton" Content="기록 저장" Click="SaveJournal"
+                                    <Button Content="기록 저장" Command="{Binding SaveCommand}"
                                             Background="#DDF66B" Foreground="#101216"
                                             BorderThickness="0" Padding="22,10" FontWeight="Bold"/>
-                                    <TextBlock x:Name="JournalStatusText" VerticalAlignment="Center"
-                                               Foreground="#A3AAB9" Margin="14,0,0,0"/>
+                                    <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}"
+                                               VerticalAlignment="Center" Margin="14,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#A3AAB9"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsError}" Value="True">
+                                                        <Setter Property="Foreground" Value="#FF8F8F"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

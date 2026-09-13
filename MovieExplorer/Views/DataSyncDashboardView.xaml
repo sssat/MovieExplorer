@@ -18,40 +18,42 @@
                                    Foreground="#8992A3" FontSize="11" Margin="0,5,0,0"/>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
-                        <TextBlock x:Name="RefreshedAtLabel" Foreground="#A3AAB9"
+                        <TextBlock Text="{Binding RefreshedAtLabel}" Foreground="#A3AAB9"
                                    VerticalAlignment="Center" Margin="0,0,16,0"/>
-                        <Button x:Name="RefreshButton" Content="새로고침" Click="RefreshDashboard"/>
+                        <Button Content="새로고침" Command="{Binding RefreshCommand}"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
 
-            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" Margin="0,70,0,0">
-                <TextBlock x:Name="StatusMessage" Text="영화 정보 현황을 확인하고 있어요…"
+            <StackPanel Visibility="{Binding IsStatusVisible, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" Margin="0,70,0,0">
+                <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}"
                            TextAlignment="Center" Foreground="#A3AAB9" FontSize="15"
                            TextWrapping="Wrap" MaxWidth="700"/>
-                <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshDashboard"
-                        Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                <Button Content="다시 시도" Command="{Binding RefreshCommand}"
+                        Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
 
-            <StackPanel x:Name="DashboardPanel" Visibility="Collapsed">
+            <StackPanel Visibility="{Binding IsDashboardVisible, Converter={StaticResource BoolToVisibility}}">
                 <UniformGrid Columns="3" Margin="0,0,0,20">
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="보유 영화" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="MovieCountLabel" FontSize="23" FontWeight="Bold"
+                            <TextBlock Text="{Binding MovieCountLabel}" FontSize="23" FontWeight="Bold"
                                        Foreground="#DDF66B" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
                         <StackPanel>
                             <TextBlock Text="포스터 정보 없음" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="MissingPosterCountLabel" FontSize="23" FontWeight="Bold" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding MissingPosterCountLabel}" FontSize="23" FontWeight="Bold" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Background="#1B1F28" CornerRadius="12" Padding="18">
                         <StackPanel>
                             <TextBlock Text="상세 정보 미등록" Foreground="#A3AAB9"/>
-                            <TextBlock x:Name="MissingTmdbCountLabel" FontSize="23" FontWeight="Bold" Margin="0,8,0,0"/>
+                            <TextBlock Text="{Binding MissingTmdbCountLabel}" FontSize="23" FontWeight="Bold" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Border>
                 </UniformGrid>
@@ -75,7 +77,7 @@
                             <TextBlock Grid.Column="3" Text="확인 가능 기간" Foreground="#A3AAB9"/>
                             <TextBlock Grid.Column="4" Text="최근 업데이트" Foreground="#A3AAB9"/>
                         </Grid>
-                        <ItemsControl x:Name="DataSetRows">
+                        <ItemsControl ItemsSource="{Binding DataSets}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="#303642" BorderThickness="0,1,0,0" Padding="8,12">
@@ -103,9 +105,9 @@
                 <TextBlock Text="최근 업데이트 내역" FontSize="20" FontWeight="Bold" Margin="0,0,0,4"/>
                 <TextBlock Text="각 화면의 업데이트 내역을 최신순으로 10건씩 확인합니다."
                            Foreground="#8992A3" FontSize="11" Margin="0,0,0,12"/>
-                <local:SyncLogSection x:Name="BoxOfficeLogSection"/>
-                <local:SyncLogSection x:Name="UpcomingLogSection"/>
-                <local:SyncLogSection x:Name="PastLogSection"/>
+                <local:SyncLogSection DataContext="{Binding BoxOfficeLogs}"/>
+                <local:SyncLogSection DataContext="{Binding UpcomingLogs}"/>
+                <local:SyncLogSection DataContext="{Binding PastLogs}"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

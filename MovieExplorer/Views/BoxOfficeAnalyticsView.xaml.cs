@@ -2,9 +2,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using MovieExplorer.Configuration;
 using MovieExplorer.Models;
-using MovieExplorer.Services;
+using MovieExplorer.ViewModels;
 
 namespace MovieExplorer.Views;
 
@@ -14,110 +13,34 @@ public partial class BoxOfficeAnalyticsView : UserControl
     private static readonly Brush MutedBrush = new SolidColorBrush(Color.FromRgb(137, 146, 163));
     private static readonly Brush GridBrush = new SolidColorBrush(Color.FromRgb(48, 54, 66));
     private static readonly Brush DecreaseBrush = new SolidColorBrush(Color.FromRgb(255, 111, 111));
-    private readonly BoxOfficeAnalyticsRepository repository = new(DatabaseSettings.ConnectionString);
     private MovieAnalyticsResult? analytics;
-    private bool loaded;
 
     public BoxOfficeAnalyticsView()
     {
         InitializeComponent();
-        DateTime yesterday = DateTime.Today.AddDays(-1);
-        FromDatePicker.SelectedDate = yesterday.AddYears(-1);
-        ToDatePicker.SelectedDate = yesterday;
-        FromDatePicker.DisplayDateEnd = yesterday;
-        ToDatePicker.DisplayDateEnd = yesterday;
+        DataContextChanged += ViewModelChanged;
     }
 
-    public async Task EnsureLoadedAsync()
+    private void ViewModelChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (!loaded)
-            await LoadAsync();
-    }
-
-    private async void QueryAnalytics(object sender, RoutedEventArgs e) => await LoadAsync();
-
-    private async Task LoadAsync()
-    {
-        DateTime fromDate = (FromDatePicker.SelectedDate ?? DateTime.Today.AddYears(-1)).Date;
-        DateTime toDate = (ToDatePicker.SelectedDate ?? DateTime.Today.AddDays(-1)).Date;
-        if (fromDate > toDate)
+        if (e.OldValue is BoxOfficeAnalyticsViewModel oldViewModel)
+            oldViewModel.AnalyticsChanged -= AnalyticsChanged;
+        if (e.NewValue is BoxOfficeAnalyticsViewModel newViewModel)
         {
-            ShowStatus("시작일은 종료일보다 늦을 수 없습니다.");
-            return;
-        }
-
-        if (toDate >= DateTime.Today)
-        {
-            ShowStatus("종료일은 오늘보다 이전 날짜여야 합니다.");
-            return;
-        }
-
-        ShowStatus("분석할 영화와 관객 기록을 불러오는 중입니다…");
-        try
-        {
-            long? previouslySelectedId = (MovieBox.SelectedItem as AnalyticsMovieOption)?.MovieId;
-            List<AnalyticsMovieOption> movieOptions = await repository.GetMoviesAsync(fromDate, toDate);
-            if (movieOptions.Count == 0)
-            {
-                MovieBox.ItemsSource = null;
-                ShowStatus(
-                    "선택한 기간에 분석할 영화가 없습니다.\n" +
-                    "지난 영화에서 같은 기간을 먼저 조회해 주세요.");
-                return;
-            }
-
-            MovieBox.ItemsSource = movieOptions;
-            AnalyticsMovieOption selectedMovie = movieOptions.FirstOrDefault(
-                movie => movie.MovieId == previouslySelectedId) ?? movieOptions[0];
-            MovieBox.SelectedItem = selectedMovie;
-
-            analytics = await repository.GetMovieAsync(selectedMovie.MovieId, fromDate, toDate);
-            loaded = true;
-            if (analytics is null || analytics.WeeklyTrend.Count == 0)
-            {
-                ShowStatus("선택한 영화의 관객 기록이 없습니다.");
-                return;
-            }
-
-            BindAnalytics(analytics, fromDate, toDate);
-            await Dispatcher.BeginInvoke(RenderCharts);
-        }
-        catch (Exception exception)
-        {
-            ShowStatus("영화 분석 정보를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
-                exception.ToString());
+            newViewModel.AnalyticsChanged += AnalyticsChanged;
+            analytics = newViewModel.Analytics;
         }
     }
 
-    private void BindAnalytics(MovieAnalyticsResult result, DateTime fromDate, DateTime toDate)
+    private async void AnalyticsChanged(object? sender, EventArgs e)
     {
-        SelectedMovieTitle.Text = result.Title;
-        PeriodAudienceLabel.Text = $"{result.PeriodAudience:N0}명";
-        PeakAudienceLabel.Text = $"{result.PeakWeeklyAudience:N0}명";
-        RankSummaryLabel.Text = $"{result.BestRank}위 · 평균 {result.AverageRank:N1}위";
-        RankChangeLabel.Text = result.RankChangeLabel;
-        LatestAudienceChangeLabel.Text = result.LatestAudienceChangeLabel;
-        TopTenDurationLabel.Text = result.TopTenDurationLabel;
-        PeakWeekLabel.Text = result.PeakWeekLabel;
-        AudienceRetentionLabel.Text = result.AudienceRetentionLabel;
-        CoverageLabel.Text =
-            $"조회 기간 {fromDate:yyyy.MM.dd}~{toDate:yyyy.MM.dd} · 집계 {result.TrackedWeeks}주";
-        WeeklyRows.ItemsSource = result.WeeklyTrend;
-        StatusPanel.Visibility = Visibility.Collapsed;
-        DashboardPanel.Visibility = Visibility.Visible;
-    }
-
-    private void ShowStatus(string message, string? details = null)
-    {
-        DashboardPanel.Visibility = Visibility.Collapsed;
-        StatusMessage.Text = message;
-        StatusMessage.ToolTip = details;
-        StatusPanel.Visibility = Visibility.Visible;
+        analytics = (DataContext as BoxOfficeAnalyticsViewModel)?.Analytics;
+        await Dispatcher.BeginInvoke(RenderCharts);
     }
 
     private void ChartSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (analytics is not null && DashboardPanel.Visibility == Visibility.Visible)
+        if (analytics is not null)
             RenderCharts();
     }
 

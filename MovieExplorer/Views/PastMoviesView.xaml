@@ -29,32 +29,32 @@
 
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
                         <TextBlock Text="집계 시작일" Margin="0,0,0,8"/>
-                        <DatePicker x:Name="FromDatePicker" Padding="5" FontSize="13"/>
+                        <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="13"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="집계 종료일" Margin="0,0,0,8"/>
-                        <DatePicker x:Name="ToDatePicker" Padding="5" FontSize="13"/>
+                        <DatePicker SelectedDate="{Binding ToDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="13"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,12,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
-                        <TextBox x:Name="SearchBox" Padding="10,8" FontSize="14"/>
+                        <TextBox Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" Padding="10,8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="3" Margin="0,0,12,0">
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="GenreBox" Padding="8" FontSize="13"/>
+                        <ComboBox ItemsSource="{Binding Genres}" SelectedItem="{Binding SelectedGenre, Mode=TwoWay}" Padding="8" FontSize="13"/>
                     </StackPanel>
                     <StackPanel Grid.Column="4" Margin="0,0,12,0">
                         <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" Padding="8" FontSize="13"/>
+                        <ComboBox ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSort, Mode=TwoWay}" Padding="8" FontSize="13"/>
                     </StackPanel>
-                    <Button Grid.Column="5" Content="조회" Click="RefreshMovies"
+                    <Button Grid.Column="5" Content="조회" Command="{Binding QueryCommand}"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>
 
             <DockPanel Margin="0,0,0,16">
                 <TextBlock Text="과거 개봉작 둘러보기" FontSize="20" FontWeight="Bold"/>
-                <TextBlock x:Name="ResultLabel" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
+                <TextBlock Text="{Binding ResultLabel}" HorizontalAlignment="Right" Foreground="#A3AAB9"/>
             </DockPanel>
         </StackPanel>
 
@@ -65,7 +65,7 @@
             </Grid.RowDefinitions>
             <ScrollViewer x:Name="MovieScrollViewer" Grid.Row="0"
                           VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ItemsControl x:Name="MovieCards">
+                <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -91,7 +91,8 @@
                                         <TextBlock Text="{Binding Overview}" Height="42" TextWrapping="Wrap"
                                                    TextTrimming="CharacterEllipsis" FontSize="12" Foreground="#C2C7D1"/>
                                         <Button Content="영화 정보 보기  →" Margin="0,16,0,0"
-                                                Click="ShowMovie" Tag="{Binding}"/>
+                                                Command="{Binding DataContext.OpenMovieCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -100,14 +101,20 @@
                 </ItemsControl>
             </ScrollViewer>
 
-            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock x:Name="StatusMessage" Text="지난 영화를 불러오는 중입니다…"
+            <StackPanel Visibility="{Binding IsStatusVisible, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StatusMessage}" ToolTip="{Binding StatusDetails}"
                            TextAlignment="Center" Foreground="#A3AAB9" FontSize="16"
                            TextWrapping="Wrap" MaxWidth="620"/>
-                <Button x:Name="RetryButton" Content="다시 시도" Click="RefreshMovies"
-                        Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+                <Button Content="다시 시도" Command="{Binding QueryCommand}"
+                        Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibility}}"
+                        HorizontalAlignment="Center" Margin="0,16,0,0"/>
             </StackPanel>
-            <local:PaginationControl x:Name="Pagination" Grid.Row="1"/>
+            <local:PaginationControl x:Name="Pagination" Grid.Row="1"
+                                     CurrentPage="{Binding CurrentPage, Mode=TwoWay}"
+                                     TotalItemCount="{Binding TotalItemCount}"
+                                     PageSize="{Binding ItemsPerPage}"
+                                     PageChangedCommand="{Binding ChangePageCommand}"/>
         </Grid>
 
         <TextBlock Grid.Row="2" Text="영화 정보 제공: 영화진흥위원회·TMDB"

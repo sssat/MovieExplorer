@@ -6,11 +6,11 @@
     <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,0,14">
         <StackPanel>
             <DockPanel Margin="0,0,0,4">
-                <TextBlock x:Name="TitleLabel" FontSize="18" FontWeight="Bold"/>
-                <TextBlock x:Name="CountLabel" DockPanel.Dock="Right"
+                <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="Bold"/>
+                <TextBlock Text="{Binding CountLabel}" DockPanel.Dock="Right"
                            HorizontalAlignment="Right" Foreground="#A3AAB9"/>
             </DockPanel>
-            <TextBlock x:Name="DescriptionLabel" Foreground="#8992A3"
+            <TextBlock Text="{Binding Description}" Foreground="#8992A3"
                        FontSize="11" Margin="0,0,0,14"/>
             <Grid Margin="8,0,8,8">
                 <Grid.ColumnDefinitions>
@@ -24,7 +24,7 @@
                 <TextBlock Grid.Column="2" Text="상태" Foreground="#A3AAB9"/>
                 <TextBlock Grid.Column="3" Text="반영 결과" Foreground="#A3AAB9"/>
             </Grid>
-            <ItemsControl x:Name="LogRows">
+            <ItemsControl ItemsSource="{Binding Logs}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border BorderBrush="#303642" BorderThickness="0,1,0,0" Padding="8,11">
@@ -58,10 +58,13 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock x:Name="EmptyLabel" Text="아직 업데이트 내역이 없습니다."
+            <TextBlock Text="아직 업데이트 내역이 없습니다."
                        Foreground="#8992A3" HorizontalAlignment="Center" Margin="0,14,0,2"
-                       Visibility="Collapsed"/>
-            <local:PaginationControl x:Name="Pagination"/>
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}"/>
+            <local:PaginationControl CurrentPage="{Binding CurrentPage, Mode=TwoWay}"
+                                     TotalItemCount="{Binding TotalCount}"
+                                     PageSize="{Binding ItemsPerPage}"
+                                     PageChangedCommand="{Binding ChangePageCommand}"/>
         </StackPanel>
     </Border>
 </UserControl>
