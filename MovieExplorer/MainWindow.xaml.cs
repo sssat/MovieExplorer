@@ -11,11 +11,9 @@ namespace MovieExplorer;
 
 public partial class MainWindow : Window
 {
-    private const int PageSize = 10;
     private readonly BoxOfficeSyncRepository boxOfficeSyncRepository =
         new(DatabaseSettings.ConnectionString);
     private List<Movie> movies = [];
-    private int currentPage = 1;
 
     public MainWindow()
     {
@@ -27,14 +25,15 @@ public partial class MainWindow : Window
         BoxOfficeDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
-        SortBox.ItemsSource = new[] { "박스오피스 순위", "일일 관객 많은순", "평점 높은순", "개봉일 최신순" };
-        SortBox.SelectedIndex = 0;
-        BoxOfficePagination.PageChanged += (_, page) =>
+        SortBox.ItemsSource = new[]
         {
-            currentPage = page;
-            ApplyFilter();
-            BoxOfficeScrollViewer.ScrollToTop();
+            "박스오피스 순위",
+            "일일 관객 많은순",
+            "누적 관객 많은순",
+            "평점 높은순",
+            "개봉일 최신순"
         };
+        SortBox.SelectedIndex = 0;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -52,8 +51,23 @@ public partial class MainWindow : Window
         UpcomingPage.Visibility = Visibility.Collapsed;
         PastPage.Visibility = Visibility.Collapsed;
         FavoritesPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
         MovieDetailPage.Visibility = Visibility.Collapsed;
         SetActiveNavigation(BoxOfficeNavButton);
+    }
+
+    private async void ShowAnalyticsPage(object sender, RoutedEventArgs e)
+    {
+        HideBoxOfficePage();
+        UpcomingPage.Visibility = Visibility.Collapsed;
+        PastPage.Visibility = Visibility.Collapsed;
+        FavoritesPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        MovieDetailPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Visible;
+        SetActiveNavigation(AnalyticsNavButton);
+        await AnalyticsPage.EnsureLoadedAsync();
     }
 
     private async void ShowUpcomingPage(object sender, RoutedEventArgs e)
@@ -64,6 +78,8 @@ public partial class MainWindow : Window
         UpcomingPage.Visibility = Visibility.Visible;
         PastPage.Visibility = Visibility.Collapsed;
         FavoritesPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
         MovieDetailPage.Visibility = Visibility.Collapsed;
         SetActiveNavigation(UpcomingNavButton);
         await UpcomingPage.EnsureLoadedAsync();
@@ -74,6 +90,8 @@ public partial class MainWindow : Window
         HideBoxOfficePage();
         UpcomingPage.Visibility = Visibility.Collapsed;
         FavoritesPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
         MovieDetailPage.Visibility = Visibility.Collapsed;
         PastPage.Visibility = Visibility.Visible;
         SetActiveNavigation(PastNavButton);
@@ -85,18 +103,35 @@ public partial class MainWindow : Window
         HideBoxOfficePage();
         UpcomingPage.Visibility = Visibility.Collapsed;
         PastPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
         MovieDetailPage.Visibility = Visibility.Collapsed;
         FavoritesPage.Visibility = Visibility.Visible;
         SetActiveNavigation(FavoritesNavButton);
         await FavoritesPage.ReloadAsync();
     }
 
+    private async void ShowDataSyncPage(object sender, RoutedEventArgs e)
+    {
+        HideBoxOfficePage();
+        UpcomingPage.Visibility = Visibility.Collapsed;
+        PastPage.Visibility = Visibility.Collapsed;
+        FavoritesPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
+        MovieDetailPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Visible;
+        SetActiveNavigation(DataSyncNavButton);
+        await DataSyncPage.EnsureLoadedAsync();
+    }
+
     private void SetActiveNavigation(Button activeButton)
     {
         BoxOfficeNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
+        AnalyticsNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         UpcomingNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         PastNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         FavoritesNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
+        DataSyncNavButton.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         activeButton.Foreground = new SolidColorBrush(Color.FromRgb(221, 246, 107));
     }
 
@@ -109,9 +144,12 @@ public partial class MainWindow : Window
         {
             movies = await LoadKobisMoviesAsync();
 
-            GenreBox.ItemsSource = new[] { "전체" }
-                .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name));
-            GenreBox.SelectedIndex = 0;
+            string selectedGenre = GenreBox.SelectedItem as string ?? "전체";
+            List<string> genres = new[] { "전체" }
+                .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name))
+                .ToList();
+            GenreBox.ItemsSource = genres;
+            GenreBox.SelectedItem = genres.Contains(selectedGenre) ? selectedGenre : "전체";
             ApplyFilter();
         }
         catch (HttpRequestException exception)
@@ -233,12 +271,6 @@ public partial class MainWindow : Window
             $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
     }
 
-    private void FilterChanged(object sender, RoutedEventArgs e)
-    {
-        currentPage = 1;
-        ApplyFilter();
-    }
-
     private void ApplyFilter()
     {
         if (MovieCards is null || GenreBox is null || SearchBox is null || StatusPanel is null)
@@ -255,30 +287,18 @@ public partial class MainWindow : Window
         filteredQuery = (SortBox.SelectedItem as string) switch
         {
             "일일 관객 많은순" => filteredQuery.OrderByDescending(movie => movie.DailyAudience),
+            "누적 관객 많은순" => filteredQuery.OrderByDescending(movie => movie.CumulativeAudience),
             "평점 높은순" => filteredQuery.OrderByDescending(movie => movie.VoteAverage),
             "개봉일 최신순" => filteredQuery.OrderByDescending(movie => movie.ReleaseDate),
             _ => filteredQuery.OrderBy(movie => movie.Rank)
         };
 
         List<Movie> filtered = filteredQuery.ToList();
-        int totalPages = Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
-        currentPage = Math.Clamp(currentPage, 1, totalPages);
-        List<Movie> paged = filtered.Skip((currentPage - 1) * PageSize).Take(PageSize).ToList();
-
-        MovieCards.ItemsSource = paged;
-        ResultLabel.Text = $"총 {filtered.Count}편 · {currentPage}/{totalPages} 페이지";
-        BoxOfficePagination.SetState(currentPage, filtered.Count, PageSize);
+        MovieCards.ItemsSource = filtered;
+        ResultLabel.Text = $"총 {filtered.Count}편";
         StatusPanel.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         StatusMessage.Text = "검색 결과가 없어요. 다른 검색어나 장르를 선택해 보세요.";
         RetryButton.Visibility = Visibility.Collapsed;
-    }
-
-    private void ResetFilters(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear();
-        GenreBox.SelectedIndex = 0;
-        SortBox.SelectedIndex = 0;
-        currentPage = 1;
     }
 
     private async void ShowMovie(object sender, RoutedEventArgs e)
@@ -307,6 +327,8 @@ public partial class MainWindow : Window
         UpcomingPage.Visibility = Visibility.Collapsed;
         PastPage.Visibility = Visibility.Collapsed;
         FavoritesPage.Visibility = Visibility.Collapsed;
+        DataSyncPage.Visibility = Visibility.Collapsed;
+        AnalyticsPage.Visibility = Visibility.Collapsed;
         MovieDetailPage.Visibility = Visibility.Visible;
         await MovieDetailPage.ShowMovieAsync(movie);
     }
@@ -357,7 +379,6 @@ public partial class MainWindow : Window
         StatusMessage.Text = message;
         StatusPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
-        BoxOfficePagination.SetState(1, 0, PageSize);
     }
 
     private enum ReturnPage

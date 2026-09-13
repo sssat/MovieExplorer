@@ -11,21 +11,37 @@ namespace MovieExplorer.Views;
 public partial class PastMoviesView : UserControl
 {
     private const int PageSize = 10;
-    private const int MaximumMovieCount = 200;
+    private const int MaximumTmdbEnrichmentCount = 100;
+    private const int RecentRefreshDays = 28;
+    private readonly WeeklyBoxOfficeSyncRepository syncRepository =
+        new(DatabaseSettings.ConnectionString);
     private List<Movie> movies = [];
     private bool loaded;
     private int currentPage = 1;
+    private DateTime? loadedFromDate;
+    private DateTime? loadedToDate;
 
     public event EventHandler<Movie>? MovieSelected;
 
     public PastMoviesView()
     {
         InitializeComponent();
+        DateTime yesterday = DateTime.Today.AddDays(-1);
+        FromDatePicker.DisplayDateEnd = yesterday;
+        ToDatePicker.DisplayDateEnd = yesterday;
         FromDatePicker.SelectedDate = DateTime.Today.AddYears(-1);
-        ToDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
+        ToDatePicker.SelectedDate = yesterday;
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
-        SortBox.ItemsSource = new[] { "최신 개봉순", "오래된 개봉순", "평점 높은순", "제목순" };
+        SortBox.ItemsSource = new[]
+        {
+            "누적 관객 많은순",
+            "기간 관객 많은순",
+            "개봉일 최신순",
+            "개봉일 오래된순",
+            "평점 높은순",
+            "제목순"
+        };
         SortBox.SelectedIndex = 0;
         Pagination.PageChanged += (_, page) =>
         {
@@ -41,36 +57,69 @@ public partial class PastMoviesView : UserControl
             await LoadMoviesAsync();
     }
 
-    private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
-
-    private async Task LoadMoviesAsync()
+    private async void RefreshMovies(object sender, RoutedEventArgs e)
     {
-        DateTime fromDate = FromDatePicker.SelectedDate ?? DateTime.Today.AddYears(-1);
-        DateTime toDate = ToDatePicker.SelectedDate ?? DateTime.Today.AddDays(-1);
-        if (fromDate.Date > toDate.Date)
+        currentPage = 1;
+        if (!TryGetSelectedDateRange(out DateTime fromDate, out DateTime toDate))
+            return;
+
+        if (loaded && loadedFromDate == fromDate && loadedToDate == toDate)
         {
-            ShowStatus("시작일은 종료일보다 늦을 수 없습니다.", true);
+            ApplyFilter();
+            MovieScrollViewer.ScrollToTop();
             return;
         }
 
-        if (toDate.Date >= DateTime.Today)
-        {
-            toDate = DateTime.Today.AddDays(-1);
-            ToDatePicker.SelectedDate = toDate;
-        }
+        await LoadMoviesAsync(fromDate, toDate);
+    }
 
-        ShowStatus("지난 영화를 불러오는 중입니다…");
+    private async Task LoadMoviesAsync()
+    {
+        if (!TryGetSelectedDateRange(out DateTime fromDate, out DateTime toDate))
+            return;
+
+        await LoadMoviesAsync(fromDate, toDate);
+    }
+
+    private async Task LoadMoviesAsync(DateTime fromDate, DateTime toDate)
+    {
+        ShowStatus("선택한 기간의 영화를 찾고 있어요…");
         try
         {
-            string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
-            IReadOnlyList<KobisCatalogMovie> kobisMovies = await new KobisApiClient(kobisKey)
-                .GetPastMoviesAsync(fromDate, toDate, MaximumMovieCount);
+            List<DateTime> expectedWeekDates = KobisApiClient.GetWeekEndDates(fromDate, toDate);
+            HashSet<DateTime> storedWeekDates = await syncRepository
+                .GetStoredWeekEndDatesAsync(fromDate, toDate);
+            DateTime recentRefreshCutoff = DateTime.Today.AddDays(-RecentRefreshDays);
+            List<DateTime> missingWeekDates = expectedWeekDates
+                .Where(date => !storedWeekDates.Contains(date.Date) || date >= recentRefreshCutoff)
+                .ToList();
 
-            movies = await EnrichWithTmdbAsync(kobisMovies);
+            if (missingWeekDates.Count > 0)
+            {
+                ShowStatus(
+                    "영화 정보를 확인하고 있어요…\n" +
+                    "선택한 기간이 길면 조금 더 걸릴 수 있습니다.");
+                string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
+                KobisHistoricalBoxOfficeResult fetched = await new KobisApiClient(kobisKey)
+                    .GetHistoricalBoxOfficeAsync(missingWeekDates, MaximumTmdbEnrichmentCount);
+                HashSet<string> storedMovieCodes = await syncRepository.GetStoredMovieCodesAsync();
+                List<KobisHistoricalMovie> newMovies = fetched.Movies
+                    .Where(movie => !storedMovieCodes.Contains(movie.MovieCode))
+                    .ToList();
+                List<Movie> enrichedMovies = await EnrichWithTmdbAsync(newMovies);
+                await syncRepository.SyncAsync(fetched.Weeks, enrichedMovies);
+            }
+
+            movies = await syncRepository.GetMoviesAsync(fromDate, toDate);
             loaded = true;
-            GenreBox.ItemsSource = new[] { "전체" }
-                .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name));
-            GenreBox.SelectedIndex = 0;
+            loadedFromDate = fromDate;
+            loadedToDate = toDate;
+            string selectedGenre = GenreBox.SelectedItem as string ?? "전체";
+            List<string> genres = new[] { "전체" }
+                .Concat(movies.SelectMany(movie => movie.GenreNames).Distinct().OrderBy(name => name))
+                .ToList();
+            GenreBox.ItemsSource = genres;
+            GenreBox.SelectedItem = genres.Contains(selectedGenre) ? selectedGenre : "전체";
             ApplyFilter();
         }
         catch (HttpRequestException exception)
@@ -87,8 +136,28 @@ public partial class PastMoviesView : UserControl
         }
     }
 
+    private bool TryGetSelectedDateRange(out DateTime fromDate, out DateTime toDate)
+    {
+        fromDate = (FromDatePicker.SelectedDate ?? DateTime.Today.AddYears(-1)).Date;
+        toDate = (ToDatePicker.SelectedDate ?? DateTime.Today.AddDays(-1)).Date;
+
+        if (toDate >= DateTime.Today)
+        {
+            ShowStatus("지난 영화의 종료일은 오늘보다 이전 날짜여야 합니다.");
+            return false;
+        }
+
+        if (fromDate > toDate)
+        {
+            ShowStatus("시작일은 종료일보다 늦을 수 없습니다.");
+            return false;
+        }
+
+        return true;
+    }
+
     private static async Task<List<Movie>> EnrichWithTmdbAsync(
-        IReadOnlyList<KobisCatalogMovie> kobisMovies)
+        IReadOnlyList<KobisHistoricalMovie> kobisMovies)
     {
         string? tmdbToken = LocalSecrets.Get("TMDB_READ_ACCESS_TOKEN");
         if (string.IsNullOrWhiteSpace(tmdbToken))
@@ -103,7 +172,7 @@ public partial class PastMoviesView : UserControl
             {
                 string? releaseYear = kobisMovie.ReleaseDate.Length >= 4
                     ? kobisMovie.ReleaseDate[..4]
-                    : kobisMovie.ProductionYear;
+                    : null;
                 Movie? tmdbMovie = await tmdbClient.FindMovieAsync(kobisMovie.Title, releaseYear);
                 return Merge(kobisMovie, tmdbMovie);
             }
@@ -117,30 +186,29 @@ public partial class PastMoviesView : UserControl
             }
         }));
 
-        return enriched.OrderByDescending(movie => movie.ReleaseDate).ToList();
+        return enriched.OrderByDescending(movie => movie.CumulativeAudience).ToList();
     }
 
-    private static Movie Merge(KobisCatalogMovie kobis, Movie? tmdb)
+    private static Movie Merge(KobisHistoricalMovie kobis, Movie? tmdb)
     {
-        List<string> kobisGenres = kobis.Genres
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
-
         return new Movie
         {
             TmdbId = tmdb?.TmdbId ?? 0,
             KobisMovieCode = kobis.MovieCode,
             Title = kobis.Title,
-            OriginalTitle = tmdb?.OriginalTitle ?? kobis.OriginalTitle,
-            Genres = tmdb?.GenreNames.Count > 0
-                ? tmdb.Genres
-                : kobisGenres.Count > 0 ? string.Join(" · ", kobisGenres) : "장르 정보 없음",
-            GenreNames = tmdb?.GenreNames.Count > 0 ? tmdb.GenreNames : kobisGenres,
+            OriginalTitle = tmdb?.OriginalTitle ?? "",
+            Genres = tmdb?.Genres ?? "장르 정보 없음",
+            GenreNames = tmdb?.GenreNames ?? [],
             Overview = tmdb?.Overview ?? "TMDB에서 일치하는 영화 줄거리를 찾지 못했습니다.",
             ReleaseDate = FormatKobisDate(kobis.ReleaseDate),
             VoteAverage = tmdb?.VoteAverage ?? 0,
             VoteCount = tmdb?.VoteCount ?? 0,
-            PosterUrl = tmdb?.PosterUrl
+            PosterUrl = tmdb?.PosterUrl,
+            Rank = kobis.BestRank,
+            DailyAudience = kobis.PeriodAudience,
+            CumulativeAudience = kobis.CumulativeAudience,
+            AudienceContextLabel =
+                $"최고 {kobis.BestRank}위 · 기간 {kobis.PeriodAudience:N0}명 · 누적 {kobis.CumulativeAudience:N0}명"
         };
     }
 
@@ -160,12 +228,6 @@ public partial class PastMoviesView : UserControl
             $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
     }
 
-    private void FilterChanged(object sender, RoutedEventArgs e)
-    {
-        currentPage = 1;
-        ApplyFilter();
-    }
-
     private void ApplyFilter()
     {
         if (MovieCards is null || GenreBox is null || SearchBox is null || StatusPanel is null)
@@ -181,10 +243,14 @@ public partial class PastMoviesView : UserControl
 
         filteredQuery = (SortBox.SelectedItem as string) switch
         {
-            "오래된 개봉순" => filteredQuery.OrderBy(movie => movie.ReleaseDate),
+            "기간 관객 많은순" => filteredQuery.OrderByDescending(movie => movie.DailyAudience),
+            "개봉일 최신순" => filteredQuery
+                .OrderByDescending(movie => ParseReleaseDateForSort(movie.ReleaseDate) ?? DateTime.MinValue),
+            "개봉일 오래된순" => filteredQuery
+                .OrderBy(movie => ParseReleaseDateForSort(movie.ReleaseDate) ?? DateTime.MaxValue),
             "평점 높은순" => filteredQuery.OrderByDescending(movie => movie.VoteAverage),
             "제목순" => filteredQuery.OrderBy(movie => movie.Title),
-            _ => filteredQuery.OrderByDescending(movie => movie.ReleaseDate)
+            _ => filteredQuery.OrderByDescending(movie => movie.CumulativeAudience)
         };
 
         List<Movie> filtered = filteredQuery.ToList();
@@ -196,20 +262,16 @@ public partial class PastMoviesView : UserControl
         Pagination.SetState(currentPage, filtered.Count, PageSize);
         StatusPanel.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         StatusMessage.Text = movies.Count == 0
-            ? "선택한 기간에 조회된 과거 개봉작이 없습니다."
+            ? "선택한 기간에 조회된 지난 영화가 없습니다."
             : "검색 결과가 없습니다.";
         RetryButton.Visibility = Visibility.Collapsed;
     }
 
-    private void ResetFilters(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear();
-        GenreBox.SelectedIndex = 0;
-        SortBox.SelectedIndex = 0;
-        currentPage = 1;
-        FromDatePicker.SelectedDate = DateTime.Today.AddYears(-1);
-        ToDatePicker.SelectedDate = DateTime.Today.AddDays(-1);
-    }
+    private static DateTime? ParseReleaseDateForSort(string value) =>
+        DateTime.TryParseExact(value, "yyyy.MM.dd", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out DateTime date)
+            ? date
+            : null;
 
     private void ShowMovie(object sender, RoutedEventArgs e)
     {

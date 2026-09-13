@@ -74,30 +74,94 @@ BEGIN
 END;
 GO
 
-IF OBJECT_ID(N'dbo.BoxOfficeDaily', N'U') IS NULL
+IF OBJECT_ID(N'dbo.BoxOfficeDaily', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.BoxOfficeRankings', N'U') IS NULL
+    EXEC sp_rename N'dbo.BoxOfficeDaily', N'BoxOfficeRankings';
+GO
+
+IF OBJECT_ID(N'dbo.BoxOfficeRankings', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.BoxOfficeRankings', N'BoxOfficeDailyId') IS NOT NULL
+   AND COL_LENGTH(N'dbo.BoxOfficeRankings', N'BoxOfficeRankingId') IS NULL
+    EXEC sp_rename N'dbo.BoxOfficeRankings.BoxOfficeDailyId', N'BoxOfficeRankingId', N'COLUMN';
+GO
+
+IF OBJECT_ID(N'dbo.BoxOfficeRankings', N'U') IS NULL
 BEGIN
-    CREATE TABLE dbo.BoxOfficeDaily
+    CREATE TABLE dbo.BoxOfficeRankings
     (
-        BoxOfficeDailyId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_BoxOfficeDaily PRIMARY KEY,
+        BoxOfficeRankingId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_BoxOfficeRankings PRIMARY KEY,
         MovieId bigint NOT NULL,
         ShowDate date NOT NULL,
         Rank tinyint NOT NULL,
         DailyAudience bigint NOT NULL,
         CumulativeAudience bigint NOT NULL,
-        CreatedAt datetime2(0) NOT NULL CONSTRAINT DF_BoxOfficeDaily_CreatedAt DEFAULT SYSUTCDATETIME(),
-        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_BoxOfficeDaily_UpdatedAt DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT FK_BoxOfficeDaily_Movies FOREIGN KEY (MovieId)
+        CreatedAt datetime2(0) NOT NULL CONSTRAINT DF_BoxOfficeRankings_CreatedAt DEFAULT SYSUTCDATETIME(),
+        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_BoxOfficeRankings_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_BoxOfficeRankings_Movies FOREIGN KEY (MovieId)
             REFERENCES dbo.Movies(MovieId),
-        CONSTRAINT UQ_BoxOfficeDaily_ShowDate_MovieId UNIQUE (ShowDate, MovieId),
-        CONSTRAINT CK_BoxOfficeDaily_Rank CHECK (Rank BETWEEN 1 AND 10),
-        CONSTRAINT CK_BoxOfficeDaily_Audience CHECK (DailyAudience >= 0 AND CumulativeAudience >= 0)
+        CONSTRAINT UQ_BoxOfficeRankings_ShowDate_MovieId UNIQUE (ShowDate, MovieId),
+        CONSTRAINT CK_BoxOfficeRankings_Rank CHECK (Rank BETWEEN 1 AND 10),
+        CONSTRAINT CK_BoxOfficeRankings_Audience CHECK (DailyAudience >= 0 AND CumulativeAudience >= 0)
     );
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.BoxOfficeDaily') AND name = N'IX_BoxOfficeDaily_ShowDate_Rank')
-    CREATE INDEX IX_BoxOfficeDaily_ShowDate_Rank
-        ON dbo.BoxOfficeDaily(ShowDate, Rank) INCLUDE (MovieId, DailyAudience, CumulativeAudience);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.BoxOfficeRankings') AND name IN (N'IX_BoxOfficeDaily_ShowDate_Rank', N'IX_BoxOfficeRankings_ShowDate_Rank'))
+    CREATE INDEX IX_BoxOfficeRankings_ShowDate_Rank
+        ON dbo.BoxOfficeRankings(ShowDate, Rank) INCLUDE (MovieId, DailyAudience, CumulativeAudience);
+GO
+
+IF OBJECT_ID(N'dbo.BoxOfficeWeekly', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.PastMovieRankings', N'U') IS NULL
+    EXEC sp_rename N'dbo.BoxOfficeWeekly', N'PastMovieRankings';
+GO
+
+IF OBJECT_ID(N'dbo.PastMovieRankings', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PastMovieRankings', N'BoxOfficeWeeklyId') IS NOT NULL
+   AND COL_LENGTH(N'dbo.PastMovieRankings', N'PastMovieRankingId') IS NULL
+    EXEC sp_rename N'dbo.PastMovieRankings.BoxOfficeWeeklyId', N'PastMovieRankingId', N'COLUMN';
+GO
+
+IF OBJECT_ID(N'dbo.PastMovieRankings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.PastMovieRankings
+    (
+        PastMovieRankingId bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_PastMovieRankings PRIMARY KEY,
+        MovieId bigint NOT NULL,
+        WeekEndDate date NOT NULL,
+        Rank tinyint NOT NULL,
+        WeeklyAudience bigint NOT NULL,
+        CumulativeAudience bigint NOT NULL,
+        CreatedAt datetime2(0) NOT NULL CONSTRAINT DF_PastMovieRankings_CreatedAt DEFAULT SYSUTCDATETIME(),
+        UpdatedAt datetime2(0) NOT NULL CONSTRAINT DF_PastMovieRankings_UpdatedAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_PastMovieRankings_Movies FOREIGN KEY (MovieId) REFERENCES dbo.Movies(MovieId),
+        CONSTRAINT UQ_PastMovieRankings_WeekEndDate_MovieId UNIQUE (WeekEndDate, MovieId),
+        CONSTRAINT CK_PastMovieRankings_Rank CHECK (Rank BETWEEN 1 AND 10),
+        CONSTRAINT CK_PastMovieRankings_Audience CHECK (WeeklyAudience >= 0 AND CumulativeAudience >= 0)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.PastMovieRankings') AND name IN (N'IX_BoxOfficeWeekly_WeekEndDate_Rank', N'IX_PastMovieRankings_WeekEndDate_Rank'))
+    CREATE INDEX IX_PastMovieRankings_WeekEndDate_Rank
+        ON dbo.PastMovieRankings(WeekEndDate, Rank) INCLUDE (MovieId, WeeklyAudience, CumulativeAudience);
+GO
+
+IF OBJECT_ID(N'dbo.UpcomingMovieCache', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.UpcomingMovieCache
+    (
+        MovieId bigint NOT NULL CONSTRAINT PK_UpcomingMovieCache PRIMARY KEY,
+        SnapshotDate date NOT NULL,
+        LastSeenAt datetime2(0) NOT NULL CONSTRAINT DF_UpcomingMovieCache_LastSeenAt DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT FK_UpcomingMovieCache_Movies FOREIGN KEY (MovieId) REFERENCES dbo.Movies(MovieId)
+    );
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.UpcomingMovieCache') AND name = N'IX_UpcomingMovieCache_SnapshotDate')
+    CREATE INDEX IX_UpcomingMovieCache_SnapshotDate
+        ON dbo.UpcomingMovieCache(SnapshotDate) INCLUDE (MovieId);
 GO
 
 IF OBJECT_ID(N'dbo.ApiSyncLogs', N'U') IS NULL

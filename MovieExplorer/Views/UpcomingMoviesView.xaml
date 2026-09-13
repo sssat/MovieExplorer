@@ -21,26 +21,18 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*"/>
                         <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="140"/>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
-                        <TextBox x:Name="SearchBox" TextChanged="FilterChanged" Padding="10,8" FontSize="14"/>
+                        <TextBox x:Name="SearchBox" Padding="10,8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="장르" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="GenreBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                        <ComboBox x:Name="GenreBox" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
-                        <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
-                    </StackPanel>
-                    <Button Grid.Column="3" Content="초기화" Click="ResetFilters"
-                            VerticalAlignment="Bottom" Margin="0,0,10,0"/>
-                    <Button Grid.Column="4" Content="새로고침" Click="RefreshMovies"
+                    <Button Grid.Column="2" Content="조회" Click="QueryMovies"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>

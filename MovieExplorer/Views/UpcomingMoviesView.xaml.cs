@@ -12,6 +12,7 @@ public partial class UpcomingMoviesView : UserControl
 {
     private const int PageSize = 10;
     private const int MaximumMovieCount = 100;
+    private readonly UpcomingMovieRepository repository = new(DatabaseSettings.ConnectionString);
     public event EventHandler<Movie>? MovieSelected;
 
     private List<Movie> movies = [];
@@ -23,8 +24,6 @@ public partial class UpcomingMoviesView : UserControl
         InitializeComponent();
         GenreBox.ItemsSource = new[] { "전체" };
         GenreBox.SelectedIndex = 0;
-        SortBox.ItemsSource = new[] { "개봉일 빠른순", "평점 높은순", "제목순" };
-        SortBox.SelectedIndex = 0;
         Pagination.PageChanged += (_, page) =>
         {
             currentPage = page;
@@ -43,20 +42,37 @@ public partial class UpcomingMoviesView : UserControl
 
     private async void RefreshMovies(object sender, RoutedEventArgs e) => await LoadMoviesAsync();
 
+    private void QueryMovies(object sender, RoutedEventArgs e)
+    {
+        currentPage = 1;
+        ApplyFilter();
+    }
+
     private async Task LoadMoviesAsync()
     {
-        ShowStatus("개봉 예정 영화를 불러오는 중입니다…");
+        ShowStatus("곧 개봉할 영화를 찾고 있어요…");
 
         try
         {
-            string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
-            var kobisClient = new KobisApiClient(kobisKey);
-            IReadOnlyList<KobisCatalogMovie> upcomingMovies = await kobisClient.GetUpcomingMoviesAsync(
-                DateTime.Today,
-                DateTime.Today.AddMonths(6),
-                MaximumMovieCount);
+            DateTime fromDate = DateTime.Today;
+            DateTime toDate = DateTime.Today.AddMonths(6);
+            UpcomingMovieCacheResult cache = await repository.GetAsync(fromDate, toDate);
+            if (cache.SnapshotDate == DateTime.Today && cache.Movies.Count > 0)
+            {
+                movies = cache.Movies;
+            }
+            else
+            {
+                string kobisKey = RequireSecret("KOBIS_API_KEY", "KOBIS 인증키");
+                var kobisClient = new KobisApiClient(kobisKey);
+                IReadOnlyList<KobisCatalogMovie> upcomingMovies = await kobisClient.GetUpcomingMoviesAsync(
+                    fromDate,
+                    toDate,
+                    MaximumMovieCount);
 
-            movies = await EnrichWithTmdbAsync(upcomingMovies);
+                movies = await EnrichWithTmdbAsync(upcomingMovies);
+                await repository.ReplaceSnapshotAsync(DateTime.Today, movies);
+            }
             loaded = true;
 
             GenreBox.ItemsSource = new[] { "전체" }
@@ -155,12 +171,6 @@ public partial class UpcomingMoviesView : UserControl
             $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
     }
 
-    private void FilterChanged(object sender, RoutedEventArgs e)
-    {
-        currentPage = 1;
-        ApplyFilter();
-    }
-
     private void ApplyFilter()
     {
         if (MovieCards is null || GenreBox is null || SearchBox is null || StatusPanel is null)
@@ -174,13 +184,6 @@ public partial class UpcomingMoviesView : UserControl
                     || movie.OriginalTitle.Contains(query, StringComparison.OrdinalIgnoreCase)
                     || movie.Overview.Contains(query, StringComparison.OrdinalIgnoreCase)));
 
-        filteredQuery = (SortBox.SelectedItem as string) switch
-        {
-            "평점 높은순" => filteredQuery.OrderByDescending(movie => movie.VoteAverage),
-            "제목순" => filteredQuery.OrderBy(movie => movie.Title),
-            _ => filteredQuery.OrderBy(movie => movie.ReleaseDate)
-        };
-
         List<Movie> filtered = filteredQuery.ToList();
         int totalPages = Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
         currentPage = Math.Clamp(currentPage, 1, totalPages);
@@ -191,14 +194,6 @@ public partial class UpcomingMoviesView : UserControl
         StatusPanel.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         StatusMessage.Text = "검색 결과가 없어요. 다른 검색어나 장르를 선택해 보세요.";
         RetryButton.Visibility = Visibility.Collapsed;
-    }
-
-    private void ResetFilters(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear();
-        GenreBox.SelectedIndex = 0;
-        SortBox.SelectedIndex = 0;
-        currentPage = 1;
     }
 
     private void ShowMovie(object sender, RoutedEventArgs e)

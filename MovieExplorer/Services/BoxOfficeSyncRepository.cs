@@ -55,7 +55,7 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
         const string sql = """
             INSERT dbo.ApiSyncLogs (SourceName, TargetDate, Status, ReceivedCount)
             OUTPUT INSERTED.ApiSyncLogId
-            VALUES (N'KOBIS+TMDB', @TargetDate, 'Running', @ReceivedCount);
+            VALUES (N'박스오피스', @TargetDate, 'Running', @ReceivedCount);
             """;
 
         await using var connection = new SqlConnection(connectionString);
@@ -81,13 +81,24 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
             FROM dbo.Movies WITH (UPDLOCK, HOLDLOCK)
             WHERE KobisMovieCode = @KobisMovieCode;
 
+            DECLARE @SafeTmdbId int = NULLIF(@TmdbId, 0);
+            IF @SafeTmdbId IS NOT NULL
+               AND EXISTS
+               (
+                   SELECT 1
+                   FROM dbo.Movies WITH (UPDLOCK, HOLDLOCK)
+                   WHERE TmdbId = @SafeTmdbId
+                     AND (@MovieId IS NULL OR MovieId <> @MovieId)
+               )
+                SET @SafeTmdbId = NULL;
+
             IF @MovieId IS NULL
             BEGIN
                 INSERT dbo.Movies
                     (KobisMovieCode, TmdbId, Title, OriginalTitle, ReleaseDate, PosterUrl,
                      Genres, Overview, VoteAverage, VoteCount)
                 VALUES
-                    (@KobisMovieCode, NULLIF(@TmdbId, 0), @Title,
+                    (@KobisMovieCode, @SafeTmdbId, @Title,
                      NULLIF(@OriginalTitle, ''), @ReleaseDate, @PosterUrl,
                      @Genres, @Overview, @VoteAverage, @VoteCount);
                 SET @MovieId = SCOPE_IDENTITY();
@@ -95,7 +106,7 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
             ELSE
             BEGIN
                 UPDATE dbo.Movies
-                SET TmdbId = COALESCE(NULLIF(@TmdbId, 0), TmdbId),
+                SET TmdbId = COALESCE(@SafeTmdbId, TmdbId),
                     Title = @Title,
                     OriginalTitle = NULLIF(@OriginalTitle, ''),
                     ReleaseDate = @ReleaseDate,
@@ -128,11 +139,11 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
             IF EXISTS
             (
                 SELECT 1
-                FROM dbo.BoxOfficeDaily WITH (UPDLOCK, HOLDLOCK)
+                FROM dbo.BoxOfficeRankings WITH (UPDLOCK, HOLDLOCK)
                 WHERE ShowDate = @ShowDate AND MovieId = @MovieId
             )
             BEGIN
-                UPDATE dbo.BoxOfficeDaily
+                UPDATE dbo.BoxOfficeRankings
                 SET Rank = @Rank,
                     DailyAudience = @DailyAudience,
                     CumulativeAudience = @CumulativeAudience,
@@ -142,7 +153,7 @@ public sealed class BoxOfficeSyncRepository(string connectionString)
             END
             ELSE
             BEGIN
-                INSERT dbo.BoxOfficeDaily
+                INSERT dbo.BoxOfficeRankings
                     (MovieId, ShowDate, Rank, DailyAudience, CumulativeAudience)
                 VALUES
                     (@MovieId, @ShowDate, @Rank, @DailyAudience, @CumulativeAudience);

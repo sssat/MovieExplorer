@@ -5,9 +5,13 @@
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,8">
         <Button x:Name="PreviousButton" Content="←  이전" Click="GoPrevious"
                 Padding="18,8" Margin="0,0,14,0"/>
+        <TextBox x:Name="PageInput" Width="48" Padding="5" FontSize="13"
+                 TextAlignment="Center" VerticalContentAlignment="Center"
+                 PreviewTextInput="AllowNumbersOnly" KeyDown="GoToPageOnEnter"/>
         <TextBlock x:Name="PageLabel" Foreground="#C2C7D1" VerticalAlignment="Center"
-                   MinWidth="90" TextAlignment="Center"/>
+                   Margin="8,0" MinWidth="70" TextAlignment="Left"/>
+        <Button Content="이동" Click="GoToPage" Padding="12,8" Margin="0,0,14,0"/>
         <Button x:Name="NextButton" Content="다음  →" Click="GoNext"
-                Padding="18,8" Margin="14,0,0,0"/>
+                Padding="18,8"/>
     </StackPanel>
 </UserControl>

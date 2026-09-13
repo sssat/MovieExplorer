@@ -48,7 +48,7 @@ public partial class FavoriteMoviesView : UserControl
 
     private async void RefreshFavorites(object sender, RoutedEventArgs e) => await ReloadAsync();
 
-    private void FilterChanged(object sender, RoutedEventArgs e)
+    private void QueryFavorites(object sender, RoutedEventArgs e)
     {
         currentPage = 1;
         ApplyFilter();
@@ -98,14 +98,6 @@ public partial class FavoriteMoviesView : UserControl
             ? "아직 관심 영화가 없습니다.\n영화 상세 화면에서 관심 영화로 저장해 보세요."
             : "검색 결과가 없습니다.";
         RetryButton.Visibility = Visibility.Collapsed;
-    }
-
-    private void ResetFilter(object sender, RoutedEventArgs e)
-    {
-        SearchBox.Clear();
-        RatingBox.SelectedIndex = 0;
-        SortBox.SelectedIndex = 0;
-        currentPage = 1;
     }
 
     private void ShowMovie(object sender, RoutedEventArgs e)

@@ -37,14 +37,133 @@ public sealed class KobisApiClient
         DateTime toDate,
         int maximumCount = 100,
         CancellationToken cancellationToken = default) =>
-        GetCatalogMoviesAsync(fromDate, toDate, "개봉예정", maximumCount, false, cancellationToken);
+        GetCatalogMoviesAsync(fromDate, toDate, "개봉예정", maximumCount, false, false, cancellationToken);
 
     public Task<IReadOnlyList<KobisCatalogMovie>> GetPastMoviesAsync(
         DateTime fromDate,
         DateTime toDate,
-        int maximumCount = 200,
+        int maximumCount = 100,
+        bool newestFirst = true,
         CancellationToken cancellationToken = default) =>
-        GetCatalogMoviesAsync(fromDate, toDate, "개봉", maximumCount, true, cancellationToken);
+        GetCatalogMoviesAsync(
+            fromDate, toDate, "개봉", maximumCount, newestFirst, !newestFirst, cancellationToken);
+
+    public async Task<KobisHistoricalBoxOfficeResult> GetHistoricalBoxOfficeAsync(
+        DateTime fromDate,
+        DateTime toDate,
+        int maximumCount = 100,
+        CancellationToken cancellationToken = default) =>
+        await GetHistoricalBoxOfficeAsync(
+            GetWeekEndDates(fromDate.Date, toDate.Date), maximumCount, cancellationToken);
+
+    public async Task<KobisHistoricalBoxOfficeResult> GetHistoricalBoxOfficeAsync(
+        IReadOnlyList<DateTime> weekEndDates,
+        int maximumCount = 100,
+        CancellationToken cancellationToken = default)
+    {
+        using var requestLimiter = new SemaphoreSlim(4);
+        KobisWeeklyBoxOfficeResult[] weeks = await Task.WhenAll(weekEndDates.Select(async weekEndDate =>
+        {
+            await requestLimiter.WaitAsync(cancellationToken);
+            try
+            {
+                return await GetWeeklyBoxOfficeAsync(weekEndDate, cancellationToken);
+            }
+            finally
+            {
+                requestLimiter.Release();
+            }
+        }));
+
+        List<KobisWeeklyBoxOfficeResult> orderedWeeks = weeks
+            .OrderBy(week => week.WeekEndDate)
+            .ToList();
+
+        return BuildHistoricalBoxOfficeResult(orderedWeeks, maximumCount);
+    }
+
+    public static KobisHistoricalBoxOfficeResult BuildHistoricalBoxOfficeResult(
+        IReadOnlyList<KobisWeeklyBoxOfficeResult> weeks,
+        int maximumCount = 100)
+    {
+        List<KobisWeeklyBoxOfficeResult> orderedWeeks = weeks
+            .OrderBy(week => week.WeekEndDate)
+            .ToList();
+        List<KobisHistoricalMovie> movies = orderedWeeks
+            .SelectMany(week => week.Movies.Select(movie => new { week.WeekEndDate, Movie = movie }))
+            .GroupBy(item => item.Movie.MovieCode)
+            .Select(group =>
+            {
+                var ordered = group.OrderBy(item => item.WeekEndDate).ToList();
+                return new KobisHistoricalMovie
+                {
+                    MovieCode = group.Key,
+                    Title = ordered[0].Movie.Title,
+                    ReleaseDate = ordered.Select(item => item.Movie.ReleaseDate)
+                        .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "",
+                    PeriodAudience = ordered.Sum(item => item.Movie.WeeklyAudience),
+                    CumulativeAudience = ordered.Max(item => item.Movie.CumulativeAudience),
+                    BestRank = ordered.Min(item => item.Movie.Rank),
+                    FirstRank = ordered[0].Movie.Rank,
+                    LastRank = ordered[^1].Movie.Rank
+                };
+            })
+            .OrderByDescending(movie => movie.CumulativeAudience)
+            .ThenByDescending(movie => movie.PeriodAudience)
+            .Take(maximumCount)
+            .ToList();
+
+        return new KobisHistoricalBoxOfficeResult { Movies = movies, Weeks = orderedWeeks };
+    }
+
+    private async Task<KobisWeeklyBoxOfficeResult> GetWeeklyBoxOfficeAsync(
+        DateTime weekEndDate,
+        CancellationToken cancellationToken)
+    {
+        string date = weekEndDate.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        string url = "boxoffice/searchWeeklyBoxOfficeList.json" +
+                     $"?key={Uri.EscapeDataString(apiKey)}&targetDt={date}&weekGb=0";
+        using var response = await HttpClient.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var payload = await JsonSerializer.DeserializeAsync<KobisWeeklyResponse>(
+            stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, cancellationToken);
+
+        return new KobisWeeklyBoxOfficeResult
+        {
+            WeekEndDate = weekEndDate,
+            Movies = payload?.BoxOfficeResult?.WeeklyBoxOfficeList.Select(item =>
+                new KobisWeeklyBoxOfficeMovie
+                {
+                    MovieCode = item.MovieCode,
+                    Title = item.MovieName,
+                    ReleaseDate = item.OpenDate,
+                    Rank = ParseInt(item.Rank),
+                    WeeklyAudience = ParseLong(item.AudienceCount),
+                    CumulativeAudience = ParseLong(item.AudienceAccumulated)
+                }).ToList() ?? []
+        };
+    }
+
+    public static List<DateTime> GetWeekEndDates(DateTime fromDate, DateTime toDate)
+    {
+        DateTime cursor = toDate;
+        while (cursor.DayOfWeek != DayOfWeek.Sunday)
+            cursor = cursor.AddDays(-1);
+
+        var dates = new List<DateTime>();
+        while (cursor >= fromDate)
+        {
+            dates.Add(cursor);
+            cursor = cursor.AddDays(-7);
+        }
+
+        if (dates.Count == 0)
+            dates.Add(toDate);
+
+        return dates;
+    }
 
     private async Task<IReadOnlyList<KobisCatalogMovie>> GetCatalogMoviesAsync(
         DateTime fromDate,
@@ -52,6 +171,7 @@ public sealed class KobisApiClient
         string productionStatus,
         int maximumCount,
         bool newestFirst,
+        bool scanEntireRange,
         CancellationToken cancellationToken)
     {
         var collected = new List<KobisCatalogMovie>();
@@ -59,7 +179,9 @@ public sealed class KobisApiClient
         const int itemCountPerRequest = 100;
         const int maximumApiPages = 50;
 
-        for (int page = 1; page <= maximumApiPages && collected.Count < maximumCount; page++)
+        for (int page = 1;
+             page <= maximumApiPages && (scanEntireRange || collected.Count < maximumCount);
+             page++)
         {
             string startYear = fromDate.ToString("yyyy", CultureInfo.InvariantCulture);
             string endYear = toDate.ToString("yyyy", CultureInfo.InvariantCulture);
@@ -161,6 +283,17 @@ public sealed class KobisApiClient
     private sealed class KobisResponse
     {
         [JsonPropertyName("boxOfficeResult")] public BoxOfficePayload? BoxOfficeResult { get; init; }
+    }
+
+    private sealed class KobisWeeklyResponse
+    {
+        [JsonPropertyName("boxOfficeResult")] public WeeklyBoxOfficePayload? BoxOfficeResult { get; init; }
+    }
+
+    private sealed class WeeklyBoxOfficePayload
+    {
+        [JsonPropertyName("weeklyBoxOfficeList")]
+        public List<BoxOfficeItem> WeeklyBoxOfficeList { get; init; } = [];
     }
 
     private sealed class BoxOfficePayload

@@ -23,23 +23,20 @@
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="영화 제목 · 감상평 검색" Margin="0,0,0,8"/>
-                        <TextBox x:Name="SearchBox" TextChanged="FilterChanged" Padding="10,8" FontSize="14"/>
+                        <TextBox x:Name="SearchBox" Padding="10,8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
                         <TextBlock Text="개인 평점" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="RatingBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                        <ComboBox x:Name="RatingBox" Padding="8" FontSize="14"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,16,0">
                         <TextBlock Text="정렬" Margin="0,0,0,8"/>
-                        <ComboBox x:Name="SortBox" SelectionChanged="FilterChanged" Padding="8" FontSize="14"/>
+                        <ComboBox x:Name="SortBox" Padding="8" FontSize="14"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="초기화" Click="ResetFilter"
-                            VerticalAlignment="Bottom" Margin="0,0,10,0"/>
-                    <Button Grid.Column="4" Content="새로고침" Click="RefreshFavorites"
+                    <Button Grid.Column="3" Content="조회" Click="QueryFavorites"
                             VerticalAlignment="Bottom"/>
                 </Grid>
             </Border>

@@ -16,9 +16,12 @@ public sealed class Movie
     public int Rank { get; init; }
     public long DailyAudience { get; init; }
     public long CumulativeAudience { get; init; }
+    public string? AudienceContextLabel { get; init; }
 
     public string Metadata => $"{ReleaseDate} · ★ {VoteAverage:0.0} ({VoteCount:N0}명) · {Genres}";
-    public string BoxOfficeLabel => Rank > 0
+    public string BoxOfficeLabel => !string.IsNullOrWhiteSpace(AudienceContextLabel)
+        ? AudienceContextLabel
+        : Rank > 0
         ? $"KOBIS #{Rank} · 일일 {DailyAudience:N0}명 · 누적 {CumulativeAudience:N0}명"
         : "";
 }

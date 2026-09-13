@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace MovieExplorer.Views;
 
@@ -40,9 +41,38 @@ public partial class PaginationControl : UserControl
         PageChanged?.Invoke(this, currentPage + 1);
     }
 
+    private void AllowNumbersOnly(object sender, TextCompositionEventArgs e) =>
+        e.Handled = e.Text.Any(character => !char.IsDigit(character));
+
+    private void GoToPageOnEnter(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        MoveToInputPage();
+        e.Handled = true;
+    }
+
+    private void GoToPage(object sender, RoutedEventArgs e) => MoveToInputPage();
+
+    private void MoveToInputPage()
+    {
+        if (!int.TryParse(PageInput.Text, out int requestedPage))
+        {
+            PageInput.Text = currentPage.ToString();
+            return;
+        }
+
+        int targetPage = Math.Clamp(requestedPage, 1, totalPages);
+        PageInput.Text = targetPage.ToString();
+        if (targetPage != currentPage)
+            PageChanged?.Invoke(this, targetPage);
+    }
+
     private void UpdateState()
     {
-        PageLabel.Text = $"{currentPage} / {totalPages} 페이지";
+        PageInput.Text = currentPage.ToString();
+        PageLabel.Text = $"/ {totalPages} 페이지";
         PreviousButton.IsEnabled = currentPage > 1;
         NextButton.IsEnabled = currentPage < totalPages;
     }

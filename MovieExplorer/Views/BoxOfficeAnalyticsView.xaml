@@ -1,0 +1,138 @@
+<UserControl x:Class="MovieExplorer.Views.BoxOfficeAnalyticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent" Foreground="White">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="0,0,10,24">
+            <TextBlock Text="INDIVIDUAL MOVIE ANALYTICS" Foreground="#DDF66B" FontSize="12"/>
+            <TextBlock Text="개별 영화 분석" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
+            <TextBlock Text="MSSQL에 저장된 지난 영화 데이터를 바탕으로 한 영화의 관객 수와 순위 변화를 분석합니다."
+                       Foreground="#A3AAB9"/>
+
+            <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="시작일" Margin="0,0,0,8"/>
+                        <DatePicker x:Name="FromDatePicker" Padding="5" FontSize="14"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="종료일" Margin="0,0,0,8"/>
+                        <DatePicker x:Name="ToDatePicker" Padding="5" FontSize="14"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                        <TextBlock Text="분석할 영화" Margin="0,0,0,8"/>
+                        <ComboBox x:Name="MovieBox" Padding="7" FontSize="14"
+                                  DisplayMemberPath="DisplayLabel"/>
+                    </StackPanel>
+                    <Button Grid.Column="3" Content="조회" Click="QueryAnalytics"
+                            VerticalAlignment="Bottom"/>
+                </Grid>
+            </Border>
+
+            <StackPanel x:Name="StatusPanel" HorizontalAlignment="Center" Margin="0,70,0,0">
+                <TextBlock x:Name="StatusMessage" TextAlignment="Center" Foreground="#A3AAB9"
+                           FontSize="15" TextWrapping="Wrap" MaxWidth="700"/>
+            </StackPanel>
+
+            <StackPanel x:Name="DashboardPanel" Visibility="Collapsed">
+                <TextBlock x:Name="SelectedMovieTitle" FontSize="24" FontWeight="Bold" Margin="0,0,0,16"/>
+
+                <UniformGrid Columns="4" Margin="0,0,0,20">
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="기간 관객 수" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="PeriodAudienceLabel" FontSize="21" FontWeight="Bold"
+                                       Foreground="#DDF66B" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="주간 최고 관객 수" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="PeakAudienceLabel" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="최고·평균 순위" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="RankSummaryLabel" FontSize="21" FontWeight="Bold" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="순위 변화" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="RankChangeLabel" FontSize="16" FontWeight="Bold" Margin="0,10,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="주간 관객 수 변화" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="각 집계 주차에 관람한 관객 수" Foreground="#8992A3" FontSize="11" Margin="0,4,0,10"/>
+                            <Canvas x:Name="AudienceChart" Height="270" SizeChanged="ChartSizeChanged"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="#1B1F28" CornerRadius="12" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="박스오피스 순위 변화" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="위쪽에 가까울수록 높은 순위입니다." Foreground="#8992A3" FontSize="11" Margin="0,4,0,10"/>
+                            <Canvas x:Name="RankChart" Height="270" SizeChanged="ChartSizeChanged"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Background="#1B1F28" CornerRadius="12" Padding="18">
+                    <StackPanel>
+                        <TextBlock Text="주차별 상세 데이터" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock x:Name="CoverageLabel" Foreground="#8992A3" FontSize="11" Margin="0,4,0,14"/>
+                        <Grid Margin="8,0,8,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="집계 주차" Foreground="#A3AAB9"/>
+                            <TextBlock Grid.Column="1" Text="순위" Foreground="#A3AAB9"/>
+                            <TextBlock Grid.Column="2" Text="주간 관객 수" Foreground="#A3AAB9"/>
+                            <TextBlock Grid.Column="3" Text="누적 관객 수" Foreground="#A3AAB9"/>
+                        </Grid>
+                        <ItemsControl x:Name="WeeklyRows">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#303642" BorderThickness="0,1,0,0" Padding="8,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding WeekLabel}"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding RankLabel}" Foreground="#DDF66B"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding WeeklyAudienceLabel}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding CumulativeAudienceLabel}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="지난 영화 화면에서 조회하여 MSSQL에 저장된 데이터만 분석합니다."
+                           Foreground="#8992A3" FontSize="11" Margin="0,12,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
