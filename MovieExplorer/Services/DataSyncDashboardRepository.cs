@@ -26,13 +26,8 @@ public sealed class DataSyncDashboardRepository(string connectionString)
                    SUM(CASE WHEN TmdbId IS NULL THEN 1 ELSE 0 END) AS MissingTmdbCount
             FROM dbo.Movies;
 
-            SELECT COUNT_BIG(*)
-            FROM dbo.MovieJournals
-            WHERE IsFavorite = 1;
-
             SELECT N'박스오피스' AS DataSetName,
-                   N'KOBIS 일별 TOP 10 관객·순위' AS Description,
-                   COUNT_BIG(*) AS RecordCount,
+                   COUNT(DISTINCT MovieId) AS MovieCount,
                    COUNT(DISTINCT ShowDate) AS SnapshotCount,
                    MIN(ShowDate) AS FromDate,
                    MAX(ShowDate) AS ToDate,
@@ -40,13 +35,13 @@ public sealed class DataSyncDashboardRepository(string connectionString)
             FROM dbo.BoxOfficeRankings
             UNION ALL
             SELECT N'지난 영화·통계',
-                   N'지난 영화와 통계 화면에 사용하는 KOBIS 데이터',
-                   COUNT_BIG(*), COUNT(DISTINCT WeekEndDate), MIN(WeekEndDate), MAX(WeekEndDate), MAX(UpdatedAt)
+                   COUNT(DISTINCT MovieId),
+                   COUNT(DISTINCT WeekEndDate), MIN(WeekEndDate), MAX(WeekEndDate), MAX(UpdatedAt)
             FROM dbo.PastMovieRankings
             UNION ALL
             SELECT N'개봉 예정 영화',
-                   N'KOBIS 개봉 예정 목록의 최신 캐시',
-                   COUNT_BIG(*), COUNT(DISTINCT SnapshotDate), MIN(SnapshotDate), MAX(SnapshotDate), MAX(LastSeenAt)
+                   COUNT(DISTINCT MovieId),
+                   COUNT(DISTINCT SnapshotDate), MIN(SnapshotDate), MAX(SnapshotDate), MAX(LastSeenAt)
             FROM dbo.UpcomingMovieCache;
 
             SELECT COUNT(*)
@@ -110,23 +105,17 @@ public sealed class DataSyncDashboardRepository(string connectionString)
         }
 
         await reader.NextResultAsync(cancellationToken);
-        int favoriteCount = await reader.ReadAsync(cancellationToken)
-            ? Convert.ToInt32(reader.GetInt64(0))
-            : 0;
-
-        await reader.NextResultAsync(cancellationToken);
         var dataSets = new List<DataSetStatus>();
         while (await reader.ReadAsync(cancellationToken))
         {
             dataSets.Add(new DataSetStatus
             {
                 Name = reader.GetString(0),
-                Description = reader.GetString(1),
-                RecordCount = Convert.ToInt32(reader.GetInt64(2)),
-                SnapshotCount = reader.GetInt32(3),
-                FromDate = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
-                ToDate = reader.IsDBNull(5) ? null : reader.GetDateTime(5),
-                LastUpdatedAt = reader.IsDBNull(6) ? null : ToLocalTime(reader.GetDateTime(6))
+                MovieCount = reader.GetInt32(1),
+                SnapshotCount = reader.GetInt32(2),
+                FromDate = reader.IsDBNull(3) ? null : reader.GetDateTime(3),
+                ToDate = reader.IsDBNull(4) ? null : reader.GetDateTime(4),
+                LastUpdatedAt = reader.IsDBNull(5) ? null : ToLocalTime(reader.GetDateTime(5))
             });
         }
 
@@ -148,13 +137,10 @@ public sealed class DataSyncDashboardRepository(string connectionString)
         await reader.NextResultAsync(cancellationToken);
         List<ApiSyncLogItem> pastLogs = await ReadLogsAsync(reader, cancellationToken);
 
-        var builder = new SqlConnectionStringBuilder(connectionString);
         return new DataSyncDashboard
         {
-            ConnectionLabel = $"{builder.DataSource} / {builder.InitialCatalog}",
             RefreshedAt = DateTime.Now,
             MovieCount = movieCount,
-            FavoriteCount = favoriteCount,
             MissingPosterCount = missingPosterCount,
             MissingTmdbCount = missingTmdbCount,
             BoxOfficeLogCount = boxOfficeLogCount,

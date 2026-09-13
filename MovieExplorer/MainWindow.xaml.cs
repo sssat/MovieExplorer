@@ -138,7 +138,7 @@ public partial class MainWindow : Window
     private async Task LoadMoviesAsync()
     {
         ShowStatus("영화 정보를 불러오는 중입니다…");
-        SyncStatusLabel.Text = "DB 동기화 대기…";
+        SyncStatusLabel.Text = "영화 정보를 확인하고 있어요…";
         SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
         try
         {
@@ -154,15 +154,17 @@ public partial class MainWindow : Window
         }
         catch (HttpRequestException exception)
         {
-            ShowStatus($"영화 정보를 불러오지 못했습니다.\n{exception.Message}", true);
+            ShowStatus("영화 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
         catch (TaskCanceledException)
         {
-            ShowStatus("API 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.", true);
+            ShowStatus("영화 정보 서비스의 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.", true);
         }
         catch (Exception exception)
         {
-            ShowStatus(exception.Message, true);
+            ShowStatus("영화 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
     }
 
@@ -205,18 +207,18 @@ public partial class MainWindow : Window
 
     private async Task SynchronizeBoxOfficeAsync(DateTime showDate, IReadOnlyList<Movie> loadedMovies)
     {
-        SyncStatusLabel.Text = "MSSQL 동기화 중…";
+        SyncStatusLabel.Text = "최신 정보를 반영하고 있어요…";
         SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(163, 170, 185));
 
         try
         {
             BoxOfficeSyncResult result = await boxOfficeSyncRepository.SyncAsync(showDate, loadedMovies);
-            SyncStatusLabel.Text = $"DB 동기화 · 신규 {result.InsertedCount} / 갱신 {result.UpdatedCount}";
+            SyncStatusLabel.Text = "최신 정보 반영 완료";
             SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(221, 246, 107));
         }
         catch (Exception exception)
         {
-            SyncStatusLabel.Text = $"DB 동기화 실패 · {exception.Message}";
+            SyncStatusLabel.Text = "일부 정보를 반영하지 못했어요.";
             SyncStatusLabel.ToolTip = exception.ToString();
             SyncStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(255, 143, 143));
         }
@@ -248,7 +250,7 @@ public partial class MainWindow : Window
     {
         Title = kobis.Title,
         ReleaseDate = FormatKobisDate(kobis.ReleaseDate),
-        Overview = "TMDB에서 일치하는 영화 상세정보를 찾지 못했습니다.",
+        Overview = "등록된 상세 정보가 없습니다.",
         KobisMovieCode = kobis.MovieCode,
         Rank = kobis.Rank,
         DailyAudience = kobis.DailyAudience,
@@ -268,7 +270,7 @@ public partial class MainWindow : Window
             return value;
 
         throw new InvalidOperationException(
-            $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
+            "영화 정보를 불러오기 위한 연결 설정이 필요합니다. 앱 설정을 확인해 주세요.");
     }
 
     private void ApplyFilter()
@@ -372,11 +374,12 @@ public partial class MainWindow : Window
         BoxOfficeFooter.Visibility = Visibility.Collapsed;
     }
 
-    private void ShowStatus(string message, bool canRetry = false)
+    private void ShowStatus(string message, bool canRetry = false, string? details = null)
     {
         MovieCards.ItemsSource = null;
         ResultLabel.Text = "";
         StatusMessage.Text = message;
+        StatusMessage.ToolTip = details;
         StatusPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
     }

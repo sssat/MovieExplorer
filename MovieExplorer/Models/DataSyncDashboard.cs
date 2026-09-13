@@ -2,10 +2,8 @@ namespace MovieExplorer.Models;
 
 public sealed class DataSyncDashboard
 {
-    public string ConnectionLabel { get; init; } = "";
     public DateTime RefreshedAt { get; init; }
     public int MovieCount { get; init; }
-    public int FavoriteCount { get; init; }
     public int MissingPosterCount { get; init; }
     public int MissingTmdbCount { get; init; }
     public int BoxOfficeLogCount { get; init; }
@@ -17,7 +15,6 @@ public sealed class DataSyncDashboard
     public List<ApiSyncLogItem> PastLogs { get; init; } = [];
 
     public string MovieCountLabel => $"{MovieCount:N0}편";
-    public string FavoriteCountLabel => $"{FavoriteCount:N0}편";
     public string MissingPosterCountLabel => $"{MissingPosterCount:N0}편";
     public string MissingTmdbCountLabel => $"{MissingTmdbCount:N0}편";
     public string RefreshedAtLabel => $"마지막 확인 {RefreshedAt:yyyy.MM.dd HH:mm:ss}";
@@ -26,16 +23,15 @@ public sealed class DataSyncDashboard
 public sealed class DataSetStatus
 {
     public string Name { get; init; } = "";
-    public string Description { get; init; } = "";
-    public int RecordCount { get; init; }
+    public int MovieCount { get; init; }
     public int SnapshotCount { get; init; }
     public DateTime? FromDate { get; init; }
     public DateTime? ToDate { get; init; }
     public DateTime? LastUpdatedAt { get; init; }
 
-    public string RecordCountLabel => $"{RecordCount:N0}건";
+    public string MovieCountLabel => $"{MovieCount:N0}편";
     public string CoverageLabel => FromDate is null
-        ? "저장된 데이터 없음"
+        ? "보유한 정보가 없습니다."
         : FromDate == ToDate
             ? $"{FromDate:yyyy.MM.dd}"
             : $"{FromDate:yyyy.MM.dd} ~ {ToDate:yyyy.MM.dd}";
@@ -49,7 +45,7 @@ public sealed class DataSetStatus
             _ => $"{SnapshotCount:N0}개"
         };
     public string LastUpdatedLabel => LastUpdatedAt is null
-        ? "갱신 기록 없음"
+        ? "업데이트 내역 없음"
         : $"{LastUpdatedAt:yyyy.MM.dd HH:mm}";
 }
 
@@ -75,6 +71,6 @@ public sealed class ApiSyncLogItem
         "Running" => "진행 중",
         _ => Status
     };
-    public string ResultLabel => $"수신 {ReceivedCount:N0} · 신규 {InsertedCount:N0} · 갱신 {UpdatedCount:N0}";
-    public string ErrorLabel => string.IsNullOrWhiteSpace(ErrorMessage) ? "-" : ErrorMessage;
+    public string ResultLabel => $"확인 {ReceivedCount:N0} · 추가 {InsertedCount:N0} · 변경 {UpdatedCount:N0}";
+    public string ErrorLabel => string.IsNullOrWhiteSpace(ErrorMessage) ? "-" : "일부 정보를 반영하지 못했습니다.";
 }

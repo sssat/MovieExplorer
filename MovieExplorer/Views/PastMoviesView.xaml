@@ -110,7 +110,7 @@
             <local:PaginationControl x:Name="Pagination" Grid.Row="1"/>
         </Grid>
 
-        <TextBlock Grid.Row="2" Text="순위·관객 수는 KOBIS, 포스터·줄거리·평점은 TMDB에서 제공합니다."
+        <TextBlock Grid.Row="2" Text="영화 정보 제공: 영화진흥위원회·TMDB"
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
     </Grid>
 </UserControl>

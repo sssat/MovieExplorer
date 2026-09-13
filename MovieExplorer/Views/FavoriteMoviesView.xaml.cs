@@ -42,7 +42,8 @@ public partial class FavoriteMoviesView : UserControl
         }
         catch (Exception exception)
         {
-            ShowStatus($"관심 영화를 불러오지 못했습니다.\n{exception.Message}", true);
+            ShowStatus("관심 영화를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
     }
 
@@ -106,11 +107,12 @@ public partial class FavoriteMoviesView : UserControl
             MovieSelected?.Invoke(this, movie);
     }
 
-    private void ShowStatus(string message, bool canRetry = false)
+    private void ShowStatus(string message, bool canRetry = false, string? details = null)
     {
         MovieCards.ItemsSource = null;
         ResultLabel.Text = "";
         StatusMessage.Text = message;
+        StatusMessage.ToolTip = details;
         StatusPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
         Pagination.SetState(1, 0, PageSize);

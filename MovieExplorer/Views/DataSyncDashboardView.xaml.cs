@@ -47,7 +47,8 @@ public partial class DataSyncDashboardView : UserControl
 
     private async Task LoadDashboardAsync()
     {
-        StatusMessage.Text = "저장된 데이터 현황을 확인하고 있어요…";
+        StatusMessage.Text = "영화 정보 현황을 확인하고 있어요…";
+        StatusMessage.ToolTip = null;
         StatusPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = Visibility.Collapsed;
         DashboardPanel.Visibility = Visibility.Collapsed;
@@ -60,30 +61,28 @@ public partial class DataSyncDashboardView : UserControl
                 upcomingLogPage,
                 pastLogPage,
                 LogPageSize);
-            ConnectionLabel.Text = dashboard.ConnectionLabel;
             RefreshedAtLabel.Text = dashboard.RefreshedAtLabel;
             MovieCountLabel.Text = dashboard.MovieCountLabel;
-            FavoriteCountLabel.Text = dashboard.FavoriteCountLabel;
             MissingPosterCountLabel.Text = dashboard.MissingPosterCountLabel;
             MissingTmdbCountLabel.Text = dashboard.MissingTmdbCountLabel;
             DataSetRows.ItemsSource = dashboard.DataSets;
             BoxOfficeLogSection.SetState(
                 "박스오피스",
-                "기준일의 KOBIS 일별 TOP 10과 TMDB 상세정보 저장 기록",
+                "선택한 날짜의 박스오피스 영화 정보 업데이트 내역",
                 dashboard.BoxOfficeLogs,
                 boxOfficeLogPage,
                 dashboard.BoxOfficeLogCount,
                 LogPageSize);
             UpcomingLogSection.SetState(
                 "개봉 예정",
-                "향후 6개월 내 개봉 예정 영화 캐시 갱신 기록",
+                "앞으로 6개월 내 개봉 예정 영화 업데이트 내역",
                 dashboard.UpcomingLogs,
                 upcomingLogPage,
                 dashboard.UpcomingLogCount,
                 LogPageSize);
             PastLogSection.SetState(
                 "지난 영화",
-                "선택 기간에 조회한 지난 영화의 KOBIS 데이터 저장 기록",
+                "선택한 기간의 지난 영화 업데이트 내역",
                 dashboard.PastLogs,
                 pastLogPage,
                 dashboard.PastLogCount,
@@ -95,7 +94,7 @@ public partial class DataSyncDashboardView : UserControl
         }
         catch (Exception exception)
         {
-            StatusMessage.Text = $"데이터 현황을 확인하지 못했습니다.\n{exception.Message}";
+            StatusMessage.Text = "영화 정보 현황을 확인하지 못했어요.\n잠시 후 다시 시도해 주세요.";
             StatusMessage.ToolTip = exception.ToString();
             RetryButton.Visibility = Visibility.Visible;
         }

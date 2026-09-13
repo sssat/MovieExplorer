@@ -22,6 +22,6 @@ public sealed class Movie
     public string BoxOfficeLabel => !string.IsNullOrWhiteSpace(AudienceContextLabel)
         ? AudienceContextLabel
         : Rank > 0
-        ? $"KOBIS #{Rank} · 일일 {DailyAudience:N0}명 · 누적 {CumulativeAudience:N0}명"
+        ? $"박스오피스 {Rank}위 · 일일 {DailyAudience:N0}명 · 누적 {CumulativeAudience:N0}명"
         : "";
 }

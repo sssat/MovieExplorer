@@ -82,15 +82,17 @@ public partial class UpcomingMoviesView : UserControl
         }
         catch (HttpRequestException exception)
         {
-            ShowStatus($"개봉 예정 영화를 불러오지 못했습니다.\n{exception.Message}", true);
+            ShowStatus("개봉 예정 영화를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
         catch (TaskCanceledException)
         {
-            ShowStatus("API 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.", true);
+            ShowStatus("영화 정보 서비스의 응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.", true);
         }
         catch (Exception exception)
         {
-            ShowStatus(exception.Message, true);
+            ShowStatus("개봉 예정 영화를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
     }
 
@@ -111,7 +113,10 @@ public partial class UpcomingMoviesView : UserControl
                 string? releaseYear = kobisMovie.ReleaseDate.Length >= 4
                     ? kobisMovie.ReleaseDate[..4]
                     : kobisMovie.ProductionYear;
-                Movie? tmdbMovie = await tmdbClient.FindMovieAsync(kobisMovie.Title, releaseYear);
+                Movie? tmdbMovie = await tmdbClient.FindMovieAsync(
+                    kobisMovie.Title,
+                    kobisMovie.OriginalTitle,
+                    releaseYear);
                 return Merge(kobisMovie, tmdbMovie);
             }
             catch
@@ -143,7 +148,7 @@ public partial class UpcomingMoviesView : UserControl
                 ? tmdb.Genres
                 : kobisGenres.Count > 0 ? string.Join(" · ", kobisGenres) : "장르 정보 없음",
             GenreNames = tmdb?.GenreNames.Count > 0 ? tmdb.GenreNames : kobisGenres,
-            Overview = tmdb?.Overview ?? "TMDB에서 일치하는 영화 줄거리를 찾지 못했습니다.",
+            Overview = tmdb?.Overview ?? "등록된 줄거리 정보가 없습니다.",
             ReleaseDate = FormatKobisDate(kobis.ReleaseDate),
             VoteAverage = tmdb?.VoteAverage ?? 0,
             VoteCount = tmdb?.VoteCount ?? 0,
@@ -168,7 +173,7 @@ public partial class UpcomingMoviesView : UserControl
             return value;
 
         throw new InvalidOperationException(
-            $"{displayName}가 설정되지 않았습니다.\nMovieExplorer 프로젝트의 .env 파일에 {key}를 입력해 주세요.");
+            "영화 정보를 불러오기 위한 연결 설정이 필요합니다. 앱 설정을 확인해 주세요.");
     }
 
     private void ApplyFilter()
@@ -204,11 +209,12 @@ public partial class UpcomingMoviesView : UserControl
         MovieSelected?.Invoke(this, movie);
     }
 
-    private void ShowStatus(string message, bool canRetry = false)
+    private void ShowStatus(string message, bool canRetry = false, string? details = null)
     {
         MovieCards.ItemsSource = null;
         ResultLabel.Text = "";
         StatusMessage.Text = message;
+        StatusMessage.ToolTip = details;
         StatusPanel.Visibility = Visibility.Visible;
         RetryButton.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
         Pagination.SetState(1, 0, PageSize);

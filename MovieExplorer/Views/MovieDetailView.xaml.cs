@@ -46,7 +46,8 @@ public partial class MovieDetailView : UserControl
         }
         catch (Exception exception)
         {
-            SetStatus($"DB 연결 실패: {exception.Message}", true);
+            SetStatus("나의 영화 기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
         finally
         {
@@ -77,7 +78,8 @@ public partial class MovieDetailView : UserControl
         }
         catch (Exception exception)
         {
-            SetStatus($"저장 실패: {exception.Message}", true);
+            SetStatus("기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.", true,
+                exception.ToString());
         }
         finally
         {
@@ -90,9 +92,10 @@ public partial class MovieDetailView : UserControl
         BackRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    private void SetStatus(string message, bool isError = false)
+    private void SetStatus(string message, bool isError = false, string? details = null)
     {
         JournalStatusText.Text = message;
+        JournalStatusText.ToolTip = details;
         JournalStatusText.Foreground = new SolidColorBrush(isError
             ? Color.FromRgb(255, 143, 143)
             : Color.FromRgb(163, 170, 185));

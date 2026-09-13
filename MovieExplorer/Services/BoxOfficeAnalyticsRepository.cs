@@ -71,16 +71,24 @@ public sealed class BoxOfficeAnalyticsRepository(string connectionString)
 
         string? title = null;
         var trend = new List<MovieAnalyticsPoint>();
+        long? previousWeeklyAudience = null;
+        DateTime? previousWeekEndDate = null;
         while (await reader.ReadAsync(cancellationToken))
         {
             title ??= reader.GetString(0);
+            DateTime weekEndDate = reader.GetDateTime(1);
+            long weeklyAudience = reader.GetInt64(3);
             trend.Add(new MovieAnalyticsPoint
             {
-                WeekEndDate = reader.GetDateTime(1),
+                WeekEndDate = weekEndDate,
                 Rank = reader.GetInt32(2),
-                WeeklyAudience = reader.GetInt64(3),
-                CumulativeAudience = reader.GetInt64(4)
+                WeeklyAudience = weeklyAudience,
+                CumulativeAudience = reader.GetInt64(4),
+                PreviousWeeklyAudience = previousWeeklyAudience,
+                PreviousWeekEndDate = previousWeekEndDate
             });
+            previousWeeklyAudience = weeklyAudience;
+            previousWeekEndDate = weekEndDate;
         }
 
         return title is null

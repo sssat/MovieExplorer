@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MovieExplorer.Models;
@@ -47,11 +48,48 @@ public sealed class TmdbApiClient
         return payload?.Results.Select(MapMovie).ToList() ?? [];
     }
 
+    public Task<Movie?> FindMovieAsync(
+        string title, string? releaseYear, CancellationToken cancellationToken = default) =>
+        FindMovieAsync(title, null, releaseYear, cancellationToken);
+
     public async Task<Movie?> FindMovieAsync(
-        string title, string? releaseYear, CancellationToken cancellationToken = default)
+        string title,
+        string? originalTitle,
+        string? releaseYear,
+        CancellationToken cancellationToken = default)
     {
-        string yearQuery = string.IsNullOrWhiteSpace(releaseYear) ? "" : $"&year={Uri.EscapeDataString(releaseYear)}";
-        string url = $"search/movie?language=ko-KR&region=KR&query={Uri.EscapeDataString(title)}{yearQuery}";
+        List<TmdbMovie> candidates = await SearchMoviesAsync(title, releaseYear, cancellationToken);
+        TmdbMovie? match = SelectBestMatch(candidates, title, originalTitle, releaseYear);
+        if (match is not null)
+            return MapMovie(match);
+
+        if (!string.IsNullOrWhiteSpace(releaseYear))
+        {
+            candidates = await SearchMoviesAsync(title, null, cancellationToken);
+            match = SelectBestMatch(candidates, title, originalTitle, releaseYear);
+            if (match is not null)
+                return MapMovie(match);
+        }
+
+        if (!string.IsNullOrWhiteSpace(originalTitle)
+            && NormalizeTitle(originalTitle) != NormalizeTitle(title))
+        {
+            candidates = await SearchMoviesAsync(originalTitle, releaseYear, cancellationToken);
+            match = SelectBestMatch(candidates, title, originalTitle, releaseYear);
+            if (match is not null)
+                return MapMovie(match);
+        }
+
+        return null;
+    }
+
+    private async Task<List<TmdbMovie>> SearchMoviesAsync(
+        string title, string? releaseYear, CancellationToken cancellationToken)
+    {
+        string yearQuery = string.IsNullOrWhiteSpace(releaseYear)
+            ? ""
+            : $"&year={Uri.EscapeDataString(releaseYear)}";
+        string url = $"search/movie?language=ko-KR&region=KR&include_adult=false&query={Uri.EscapeDataString(title)}{yearQuery}";
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -62,7 +100,110 @@ public sealed class TmdbApiClient
         var payload = await JsonSerializer.DeserializeAsync<TmdbMovieListResponse>(
             stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, cancellationToken);
 
-        return payload?.Results.Count > 0 ? MapMovie(payload.Results[0]) : null;
+        return payload?.Results ?? [];
+    }
+
+    private static TmdbMovie? SelectBestMatch(
+        IReadOnlyList<TmdbMovie> candidates,
+        string title,
+        string? originalTitle,
+        string? releaseYear)
+    {
+        string[] sourceTitles = [title, originalTitle ?? ""];
+        int? sourceYear = int.TryParse(releaseYear, out int parsedYear) ? parsedYear : null;
+
+        var ranked = candidates
+            .Select(candidate =>
+            {
+                double titleSimilarity = sourceTitles
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .SelectMany(source => new[]
+                    {
+                        CalculateTitleSimilarity(source, candidate.Title),
+                        CalculateTitleSimilarity(source, candidate.OriginalTitle)
+                    })
+                    .DefaultIfEmpty(0)
+                    .Max();
+                int? candidateYear = DateTime.TryParse(candidate.ReleaseDate, out DateTime releaseDate)
+                    ? releaseDate.Year
+                    : null;
+                double yearScore = CalculateYearScore(sourceYear, candidateYear);
+                double reliabilityScore = Math.Min(8, Math.Log10(candidate.VoteCount + 1) * 2);
+                return new
+                {
+                    Movie = candidate,
+                    TitleSimilarity = titleSimilarity,
+                    Score = titleSimilarity * 100 + yearScore + reliabilityScore
+                };
+            })
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenByDescending(candidate => candidate.Movie.VoteCount)
+            .FirstOrDefault();
+
+        return ranked is { TitleSimilarity: >= 0.72, Score: >= 80 }
+            ? ranked.Movie
+            : null;
+    }
+
+    private static double CalculateYearScore(int? sourceYear, int? candidateYear)
+    {
+        if (sourceYear is null || candidateYear is null)
+            return 0;
+
+        return Math.Abs(sourceYear.Value - candidateYear.Value) switch
+        {
+            0 => 25,
+            1 => 15,
+            2 => 8,
+            _ => -10
+        };
+    }
+
+    private static double CalculateTitleSimilarity(string left, string right)
+    {
+        string normalizedLeft = NormalizeTitle(left);
+        string normalizedRight = NormalizeTitle(right);
+        if (normalizedLeft.Length == 0 || normalizedRight.Length == 0)
+            return 0;
+        if (normalizedLeft == normalizedRight)
+            return 1;
+        if (Math.Min(normalizedLeft.Length, normalizedRight.Length) >= 4
+            && (normalizedLeft.Contains(normalizedRight) || normalizedRight.Contains(normalizedLeft)))
+            return 0.88;
+
+        int distance = CalculateEditDistance(normalizedLeft, normalizedRight);
+        return 1d - distance / (double)Math.Max(normalizedLeft.Length, normalizedRight.Length);
+    }
+
+    private static string NormalizeTitle(string value)
+    {
+        string normalized = value.Normalize(NormalizationForm.FormKC);
+        return new string(normalized
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+    }
+
+    private static int CalculateEditDistance(string left, string right)
+    {
+        int[] previous = Enumerable.Range(0, right.Length + 1).ToArray();
+        int[] current = new int[right.Length + 1];
+
+        for (int leftIndex = 1; leftIndex <= left.Length; leftIndex++)
+        {
+            current[0] = leftIndex;
+            for (int rightIndex = 1; rightIndex <= right.Length; rightIndex++)
+            {
+                int substitutionCost = left[leftIndex - 1] == right[rightIndex - 1] ? 0 : 1;
+                current[rightIndex] = Math.Min(
+                    Math.Min(current[rightIndex - 1] + 1, previous[rightIndex] + 1),
+                    previous[rightIndex - 1] + substitutionCost);
+            }
+
+            (previous, current) = (current, previous);
+        }
+
+        return previous[right.Length];
     }
 
     private static Movie MapMovie(TmdbMovie dto)

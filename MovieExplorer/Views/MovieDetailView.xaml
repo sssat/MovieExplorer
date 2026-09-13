@@ -52,20 +52,10 @@
                         <TextBlock Text="{Binding Overview}" Foreground="#C2C7D1" FontSize="14"
                                    TextWrapping="Wrap" LineHeight="24" Margin="0,12,0,0"/>
 
-                        <Border Background="#242A34" CornerRadius="8" Padding="16" Margin="0,28,0,0">
-                            <StackPanel>
-                                <TextBlock Text="데이터 식별 정보" FontWeight="Bold" Margin="0,0,0,10"/>
-                                <TextBlock Text="{Binding KobisMovieCode, StringFormat=KOBIS 영화 코드: {0}}"
-                                           Foreground="#A3AAB9"/>
-                                <TextBlock Text="{Binding TmdbId, StringFormat=TMDB 영화 ID: {0}}"
-                                           Foreground="#A3AAB9" Margin="0,6,0,0"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Background="#242A34" CornerRadius="8" Padding="20" Margin="0,18,0,0">
+                        <Border Background="#242A34" CornerRadius="8" Padding="20" Margin="0,28,0,0">
                             <StackPanel>
                                 <TextBlock Text="나의 영화 기록" FontSize="20" FontWeight="Bold"/>
-                                <TextBlock Text="관심 여부와 감상 기록은 MSSQL에 저장됩니다."
+                                <TextBlock Text="관심 영화로 표시하고 나만의 평점과 감상평을 남겨보세요."
                                            Foreground="#A3AAB9" FontSize="12" Margin="0,5,0,18"/>
 
                                 <CheckBox x:Name="FavoriteCheckBox" Content="관심 영화로 저장"
@@ -96,7 +86,7 @@
             </Border>
         </ScrollViewer>
 
-        <TextBlock Grid.Row="2" Text="흥행 정보는 KOBIS, 포스터·줄거리·평점은 TMDB에서 제공합니다."
+        <TextBlock Grid.Row="2" Text="영화 정보 제공: 영화진흥위원회·TMDB"
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
     </Grid>
 </UserControl>

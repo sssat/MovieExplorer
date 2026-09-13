@@ -13,6 +13,7 @@ public partial class BoxOfficeAnalyticsView : UserControl
     private static readonly Brush AccentBrush = new SolidColorBrush(Color.FromRgb(221, 246, 107));
     private static readonly Brush MutedBrush = new SolidColorBrush(Color.FromRgb(137, 146, 163));
     private static readonly Brush GridBrush = new SolidColorBrush(Color.FromRgb(48, 54, 66));
+    private static readonly Brush DecreaseBrush = new SolidColorBrush(Color.FromRgb(255, 111, 111));
     private readonly BoxOfficeAnalyticsRepository repository = new(DatabaseSettings.ConnectionString);
     private MovieAnalyticsResult? analytics;
     private bool loaded;
@@ -51,7 +52,7 @@ public partial class BoxOfficeAnalyticsView : UserControl
             return;
         }
 
-        ShowStatus("MSSQL에서 분석할 영화와 주간 데이터를 불러오는 중입니다…");
+        ShowStatus("분석할 영화와 관객 기록을 불러오는 중입니다…");
         try
         {
             long? previouslySelectedId = (MovieBox.SelectedItem as AnalyticsMovieOption)?.MovieId;
@@ -60,8 +61,8 @@ public partial class BoxOfficeAnalyticsView : UserControl
             {
                 MovieBox.ItemsSource = null;
                 ShowStatus(
-                    "선택한 기간에 동기화된 영화가 없습니다.\n" +
-                    "지난 영화 페이지에서 같은 기간을 조회하면 KOBIS 주간 데이터가 MSSQL에 저장됩니다.");
+                    "선택한 기간에 분석할 영화가 없습니다.\n" +
+                    "지난 영화에서 같은 기간을 먼저 조회해 주세요.");
                 return;
             }
 
@@ -74,7 +75,7 @@ public partial class BoxOfficeAnalyticsView : UserControl
             loaded = true;
             if (analytics is null || analytics.WeeklyTrend.Count == 0)
             {
-                ShowStatus("선택한 영화의 주간 데이터가 없습니다.");
+                ShowStatus("선택한 영화의 관객 기록이 없습니다.");
                 return;
             }
 
@@ -83,7 +84,8 @@ public partial class BoxOfficeAnalyticsView : UserControl
         }
         catch (Exception exception)
         {
-            ShowStatus($"영화 분석 데이터를 불러오지 못했습니다.\n{exception.Message}");
+            ShowStatus("영화 분석 정보를 불러오지 못했습니다.\n잠시 후 다시 시도해 주세요.",
+                exception.ToString());
         }
     }
 
@@ -94,17 +96,22 @@ public partial class BoxOfficeAnalyticsView : UserControl
         PeakAudienceLabel.Text = $"{result.PeakWeeklyAudience:N0}명";
         RankSummaryLabel.Text = $"{result.BestRank}위 · 평균 {result.AverageRank:N1}위";
         RankChangeLabel.Text = result.RankChangeLabel;
+        LatestAudienceChangeLabel.Text = result.LatestAudienceChangeLabel;
+        TopTenDurationLabel.Text = result.TopTenDurationLabel;
+        PeakWeekLabel.Text = result.PeakWeekLabel;
+        AudienceRetentionLabel.Text = result.AudienceRetentionLabel;
         CoverageLabel.Text =
-            $"조회 기간 {fromDate:yyyy.MM.dd}~{toDate:yyyy.MM.dd} · DB 보유 {result.TrackedWeeks}주";
+            $"조회 기간 {fromDate:yyyy.MM.dd}~{toDate:yyyy.MM.dd} · 집계 {result.TrackedWeeks}주";
         WeeklyRows.ItemsSource = result.WeeklyTrend;
         StatusPanel.Visibility = Visibility.Collapsed;
         DashboardPanel.Visibility = Visibility.Visible;
     }
 
-    private void ShowStatus(string message)
+    private void ShowStatus(string message, string? details = null)
     {
         DashboardPanel.Visibility = Visibility.Collapsed;
         StatusMessage.Text = message;
+        StatusMessage.ToolTip = details;
         StatusPanel.Visibility = Visibility.Visible;
     }
 
@@ -121,6 +128,8 @@ public partial class BoxOfficeAnalyticsView : UserControl
 
         DrawAudienceChart(analytics.WeeklyTrend);
         DrawRankChart(analytics.WeeklyTrend);
+        DrawCumulativeAudienceChart(analytics.WeeklyTrend);
+        DrawAudienceChangeChart(analytics.WeeklyTrend);
     }
 
     private void DrawAudienceChart(IReadOnlyList<MovieAnalyticsPoint> points)
@@ -152,6 +161,7 @@ public partial class BoxOfficeAnalyticsView : UserControl
                 y,
                 $"{points[index].WeekEndDate:yyyy.MM.dd}\n" +
                 $"주간 관객 {points[index].WeeklyAudience:N0}명\n" +
+                $"직전 집계 대비 {points[index].WeeklyChangeLabel}\n" +
                 $"누적 관객 {points[index].CumulativeAudience:N0}명\n" +
                 $"박스오피스 {points[index].Rank}위");
             AddDateLabel(AudienceChart, points[index].WeekEndDate, index, points.Count, x, top + plotHeight);
@@ -189,11 +199,116 @@ public partial class BoxOfficeAnalyticsView : UserControl
                 $"{points[index].WeekEndDate:yyyy.MM.dd}\n" +
                 $"박스오피스 {points[index].Rank}위\n" +
                 $"주간 관객 {points[index].WeeklyAudience:N0}명\n" +
+                $"직전 집계 대비 {points[index].WeeklyChangeLabel}\n" +
                 $"누적 관객 {points[index].CumulativeAudience:N0}명");
             AddDateLabel(RankChart, points[index].WeekEndDate, index, points.Count, x, top + plotHeight);
         }
 
         RankChart.Children.Insert(0, line);
+    }
+
+    private void DrawCumulativeAudienceChart(IReadOnlyList<MovieAnalyticsPoint> points)
+    {
+        CumulativeAudienceChart.Children.Clear();
+        double width = Math.Max(CumulativeAudienceChart.ActualWidth, 420);
+        const double height = 270;
+        const double left = 58;
+        const double top = 18;
+        const double right = 18;
+        const double bottom = 40;
+        double plotWidth = width - left - right;
+        double plotHeight = height - top - bottom;
+        long maximum = Math.Max(points.Max(point => point.CumulativeAudience), 1);
+
+        DrawAxes(CumulativeAudienceChart, left, top, plotWidth, plotHeight);
+        AddText(CumulativeAudienceChart, FormatCompact(maximum), 0, top - 8, MutedBrush, 10);
+        AddText(CumulativeAudienceChart, "0", 38, top + plotHeight - 8, MutedBrush, 10);
+
+        var line = new Polyline { Stroke = AccentBrush, StrokeThickness = 3 };
+        for (int index = 0; index < points.Count; index++)
+        {
+            MovieAnalyticsPoint point = points[index];
+            double x = GetPointX(index, points.Count, left, plotWidth);
+            double y = top + plotHeight - plotHeight * point.CumulativeAudience / maximum;
+            line.Points.Add(new Point(x, y));
+            AddMarker(
+                CumulativeAudienceChart,
+                x,
+                y,
+                $"{point.WeekEndDate:yyyy.MM.dd}\n" +
+                $"누적 관객 {point.CumulativeAudience:N0}명\n" +
+                $"주간 관객 {point.WeeklyAudience:N0}명\n" +
+                $"박스오피스 {point.Rank}위");
+            AddDateLabel(CumulativeAudienceChart, point.WeekEndDate, index, points.Count, x, top + plotHeight);
+        }
+
+        CumulativeAudienceChart.Children.Insert(0, line);
+    }
+
+    private void DrawAudienceChangeChart(IReadOnlyList<MovieAnalyticsPoint> points)
+    {
+        AudienceChangeChart.Children.Clear();
+        double width = Math.Max(AudienceChangeChart.ActualWidth, 420);
+        const double height = 270;
+        const double left = 58;
+        const double top = 18;
+        const double right = 18;
+        const double bottom = 40;
+        double plotWidth = width - left - right;
+        double plotHeight = height - top - bottom;
+        List<double> changeRates = points
+            .Where(point => point.WeeklyChangeRate.HasValue)
+            .Select(point => point.WeeklyChangeRate!.Value)
+            .ToList();
+        double maximumAbsoluteRate = Math.Max(changeRates.DefaultIfEmpty(0).Max(Math.Abs), 1);
+        double zeroY = top + plotHeight / 2;
+
+        AddLine(AudienceChangeChart, left, top, left, top + plotHeight, GridBrush);
+        AddLine(AudienceChangeChart, left, zeroY, left + plotWidth, zeroY, GridBrush);
+        AddText(AudienceChangeChart, $"+{maximumAbsoluteRate:N0}%", 0, top - 8, MutedBrush, 10);
+        AddText(AudienceChangeChart, "0%", 28, zeroY - 8, MutedBrush, 10);
+        AddText(AudienceChangeChart, $"-{maximumAbsoluteRate:N0}%", 0, top + plotHeight - 8, MutedBrush, 10);
+
+        double slotWidth = plotWidth / Math.Max(points.Count, 1);
+        double barWidth = Math.Clamp(slotWidth * 0.55, 5, 28);
+        for (int index = 0; index < points.Count; index++)
+        {
+            MovieAnalyticsPoint point = points[index];
+            double x = GetPointX(index, points.Count, left, plotWidth);
+            if (point.WeeklyChangeRate is double changeRate)
+            {
+                double barHeight = Math.Abs(changeRate) / maximumAbsoluteRate * (plotHeight / 2);
+                var bar = new Rectangle
+                {
+                    Width = barWidth,
+                    Height = Math.Max(barHeight, 2),
+                    Fill = changeRate >= 0 ? AccentBrush : DecreaseBrush,
+                    ToolTip = new ToolTip
+                    {
+                        Content = $"{point.WeekEndDate:yyyy.MM.dd}\n" +
+                                  $"직전 집계 대비 {point.WeeklyChangeLabel}\n" +
+                                  $"주간 관객 {point.WeeklyAudience:N0}명",
+                        Padding = new Thickness(10, 7, 10, 7)
+                    }
+                };
+                ToolTipService.SetInitialShowDelay(bar, 0);
+                ToolTipService.SetShowDuration(bar, 60_000);
+                Canvas.SetLeft(bar, x - barWidth / 2);
+                Canvas.SetTop(bar, changeRate >= 0 ? zeroY - Math.Max(barHeight, 2) : zeroY);
+                AudienceChangeChart.Children.Add(bar);
+            }
+            else
+            {
+                AddMarker(
+                    AudienceChangeChart,
+                    x,
+                    zeroY,
+                    $"{point.WeekEndDate:yyyy.MM.dd}\n{point.WeeklyChangeLabel}\n" +
+                    $"주간 관객 {point.WeeklyAudience:N0}명");
+            }
+
+            AddDateLabel(AudienceChangeChart, point.WeekEndDate, index, points.Count, x, top + plotHeight);
+        }
     }
 
     private static void DrawAxes(Canvas canvas, double left, double top, double width, double height)

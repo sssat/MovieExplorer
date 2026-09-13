@@ -44,7 +44,7 @@
                         Style="{StaticResource NavigationButtonStyle}"/>
                 <Button x:Name="AnalyticsNavButton" Content="통계" Click="ShowAnalyticsPage"
                         Style="{StaticResource NavigationButtonStyle}"/>
-                <Button x:Name="DataSyncNavButton" Content="데이터 관리" Click="ShowDataSyncPage"
+                <Button x:Name="DataSyncNavButton" Content="정보 관리" Click="ShowDataSyncPage"
                         Style="{StaticResource NavigationButtonStyle}"/>
             </StackPanel>
         </DockPanel>
@@ -52,7 +52,7 @@
         <StackPanel x:Name="BoxOfficeHeaderPanel" Grid.Row="1">
             <TextBlock x:Name="PageEyebrow" Text="DAILY BOX OFFICE IN KOREA" Foreground="#DDF66B" FontSize="12"/>
             <TextBlock x:Name="PageTitle" Text="국내 박스오피스" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
-            <TextBlock x:Name="PageDescription" Text="KOBIS 관객 수 순위와 TMDB 영화 정보를 함께 보여줍니다." Foreground="#A3AAB9"/>
+            <TextBlock x:Name="PageDescription" Text="선택한 날짜에 관객이 많이 찾은 영화와 상세 정보를 한눈에 확인해 보세요." Foreground="#A3AAB9"/>
             <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -129,7 +129,7 @@
             </StackPanel>
         </Grid>
 
-        <TextBlock x:Name="BoxOfficeFooter" Grid.Row="3" Text="박스오피스·관객 수는 KOBIS, 영화 정보·이미지·평점은 TMDB에서 제공합니다."
+        <TextBlock x:Name="BoxOfficeFooter" Grid.Row="3" Text="영화 정보 제공: 영화진흥위원회·TMDB"
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
 
         <views:UpcomingMoviesView x:Name="UpcomingPage" Grid.Row="1" Grid.RowSpan="3"

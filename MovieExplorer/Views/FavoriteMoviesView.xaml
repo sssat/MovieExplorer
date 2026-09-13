@@ -100,7 +100,7 @@
             <local:PaginationControl x:Name="Pagination" Grid.Row="1"/>
         </Grid>
 
-        <TextBlock Grid.Row="2" Text="관심 여부·개인 평점·감상평은 MSSQL에 저장됩니다."
+        <TextBlock Grid.Row="2" Text="관심 영화와 나의 평점·감상평은 저장 후 언제든 다시 확인할 수 있습니다."
                    Foreground="#939CAB" FontSize="11" VerticalAlignment="Bottom"/>
     </Grid>
 </UserControl>

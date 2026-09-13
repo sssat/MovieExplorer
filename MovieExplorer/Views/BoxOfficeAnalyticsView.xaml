@@ -6,7 +6,7 @@
         <StackPanel Margin="0,0,10,24">
             <TextBlock Text="INDIVIDUAL MOVIE ANALYTICS" Foreground="#DDF66B" FontSize="12"/>
             <TextBlock Text="개별 영화 분석" FontSize="30" FontWeight="Bold" Margin="0,8,0,10"/>
-            <TextBlock Text="MSSQL에 저장된 지난 영화 데이터를 바탕으로 한 영화의 관객 수와 순위 변화를 분석합니다."
+            <TextBlock Text="선택한 영화의 기간별 관객 수와 박스오피스 순위 변화를 확인해 보세요."
                        Foreground="#A3AAB9"/>
 
             <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,24,0,20">
@@ -71,6 +71,37 @@
                     </Border>
                 </UniformGrid>
 
+                <UniformGrid Columns="4" Margin="0,0,0,20">
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="최근 관객 증감" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="LatestAudienceChangeLabel" FontSize="21" FontWeight="Bold"
+                                       Foreground="#DDF66B" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="TOP 10 진입 기간" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="TopTenDurationLabel" FontSize="21" FontWeight="Bold"
+                                       Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="최고 흥행 주" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="PeakWeekLabel" FontSize="21" FontWeight="Bold"
+                                       Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="#1B1F28" CornerRadius="12" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="첫 집계 대비 유지율" Foreground="#A3AAB9"/>
+                            <TextBlock x:Name="AudienceRetentionLabel" FontSize="21" FontWeight="Bold"
+                                       Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
                 <Grid Margin="0,0,0,20">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -92,12 +123,36 @@
                     </Border>
                 </Grid>
 
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#1B1F28" CornerRadius="12" Padding="18" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="누적 관객 수 추이" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="시간에 따른 전체 관객 수의 성장 흐름입니다."
+                                       Foreground="#8992A3" FontSize="11" Margin="0,4,0,10"/>
+                            <Canvas x:Name="CumulativeAudienceChart" Height="270" SizeChanged="ChartSizeChanged"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Background="#1B1F28" CornerRadius="12" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="직전 집계 대비 관객 증감률" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="초록색은 증가, 빨간색은 감소를 나타냅니다."
+                                       Foreground="#8992A3" FontSize="11" Margin="0,4,0,10"/>
+                            <Canvas x:Name="AudienceChangeChart" Height="270" SizeChanged="ChartSizeChanged"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
                 <Border Background="#1B1F28" CornerRadius="12" Padding="18">
                     <StackPanel>
-                        <TextBlock Text="주차별 상세 데이터" FontSize="18" FontWeight="Bold"/>
+                        <TextBlock Text="주차별 관객 기록" FontSize="18" FontWeight="Bold"/>
                         <TextBlock x:Name="CoverageLabel" Foreground="#8992A3" FontSize="11" Margin="0,4,0,14"/>
                         <Grid Margin="8,0,8,8">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -106,7 +161,8 @@
                             <TextBlock Text="집계 주차" Foreground="#A3AAB9"/>
                             <TextBlock Grid.Column="1" Text="순위" Foreground="#A3AAB9"/>
                             <TextBlock Grid.Column="2" Text="주간 관객 수" Foreground="#A3AAB9"/>
-                            <TextBlock Grid.Column="3" Text="누적 관객 수" Foreground="#A3AAB9"/>
+                            <TextBlock Grid.Column="3" Text="직전 집계 대비" Foreground="#A3AAB9"/>
+                            <TextBlock Grid.Column="4" Text="누적 관객 수" Foreground="#A3AAB9"/>
                         </Grid>
                         <ItemsControl x:Name="WeeklyRows">
                             <ItemsControl.ItemTemplate>
@@ -118,11 +174,13 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding WeekLabel}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding RankLabel}" Foreground="#DDF66B"/>
                                             <TextBlock Grid.Column="2" Text="{Binding WeeklyAudienceLabel}"/>
-                                            <TextBlock Grid.Column="3" Text="{Binding CumulativeAudienceLabel}"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding WeeklyChangeLabel}"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding CumulativeAudienceLabel}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -130,8 +188,10 @@
                         </ItemsControl>
                     </StackPanel>
                 </Border>
-                <TextBlock Text="지난 영화 화면에서 조회하여 MSSQL에 저장된 데이터만 분석합니다."
+                <TextBlock Text="분석할 영화가 보이지 않으면 지난 영화에서 원하는 기간을 먼저 조회해 주세요."
                            Foreground="#8992A3" FontSize="11" Margin="0,12,0,0"/>
+                <TextBlock Text="TOP 10에 포함된 주차만 분석하며, 집계가 없는 기간을 관객 수 0명으로 계산하지 않습니다."
+                           Foreground="#8992A3" FontSize="11" Margin="0,4,0,0"/>
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

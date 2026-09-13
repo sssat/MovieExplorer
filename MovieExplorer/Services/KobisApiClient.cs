@@ -29,7 +29,7 @@ public sealed class KobisApiClient
                 return new KobisBoxOfficeResult(targetDate, movies);
         }
 
-        throw new InvalidOperationException("선택한 날짜 이전 7일 동안 KOBIS 박스오피스 데이터가 없습니다.");
+        throw new InvalidOperationException("선택한 날짜와 가까운 기간에 확인할 수 있는 박스오피스 정보가 없습니다.");
     }
 
     public Task<IReadOnlyList<KobisCatalogMovie>> GetUpcomingMoviesAsync(
