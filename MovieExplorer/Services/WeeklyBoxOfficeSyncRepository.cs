@@ -7,7 +7,7 @@ namespace MovieExplorer.Services;
 
 public sealed class WeeklyBoxOfficeSyncRepository(string connectionString)
 {
-    public async Task<HashSet<DateTime>> GetStoredWeekEndDatesAsync(
+    public async Task<Dictionary<DateTime, DateTime>> GetWeekSyncDatesAsync(
         DateTime fromDate,
         DateTime toDate,
         CancellationToken cancellationToken = default)
@@ -17,19 +17,18 @@ public sealed class WeeklyBoxOfficeSyncRepository(string connectionString)
         await connection.OpenAsync(cancellationToken);
 
         const string sql = """
-            SELECT WeekEndDate
-            FROM dbo.PastMovieRankings
+            SELECT WeekEndDate, LastSyncedAt
+            FROM dbo.PastMovieSyncWeeks
             WHERE WeekEndDate BETWEEN @FromDate AND @ToDate
-            GROUP BY WeekEndDate
-            HAVING COUNT(*) >= 10;
+            ORDER BY WeekEndDate;
             """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@FromDate", SqlDbType.Date).Value = fromDate.Date;
         command.Parameters.Add("@ToDate", SqlDbType.Date).Value = toDate.Date;
         await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        var dates = new HashSet<DateTime>();
+        var dates = new Dictionary<DateTime, DateTime>();
         while (await reader.ReadAsync(cancellationToken))
-            dates.Add(reader.GetDateTime(0).Date);
+            dates[reader.GetDateTime(0).Date] = reader.GetDateTime(1);
 
         return dates;
     }
@@ -128,8 +127,7 @@ public sealed class WeeklyBoxOfficeSyncRepository(string connectionString)
                 Rank = bestRank,
                 DailyAudience = periodAudience,
                 CumulativeAudience = cumulativeAudience,
-                AudienceContextLabel =
-                    $"최고 {bestRank}위 · 기간 {periodAudience:N0}명 · 누적 {cumulativeAudience:N0}명"
+                AudienceContextLabel = $"누적 관객 {cumulativeAudience:N0}명"
             });
         }
 
@@ -171,15 +169,12 @@ public sealed class WeeklyBoxOfficeSyncRepository(string connectionString)
                             connection, transaction, weeklyMovie, enriched, cancellationToken);
                         movieIds[weeklyMovie.MovieCode] = movieId;
                     }
-
-                    bool inserted = await UpsertWeeklyResultAsync(
-                        connection, transaction, movieId, week.WeekEndDate, weeklyMovie, cancellationToken);
-                    if (inserted)
-                        insertedCount++;
-                    else
-                        updatedCount++;
                 }
             }
+
+            (insertedCount, updatedCount) = await UpsertWeeklyResultsAsync(
+                connection, transaction, weeks, movieIds, cancellationToken);
+            await UpsertSyncWeeksAsync(connection, transaction, weeks, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -269,42 +264,144 @@ public sealed class WeeklyBoxOfficeSyncRepository(string connectionString)
         return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
     }
 
-    private static async Task<bool> UpsertWeeklyResultAsync(
+    private static async Task<(int InsertedCount, int UpdatedCount)> UpsertWeeklyResultsAsync(
         SqlConnection connection,
         SqlTransaction transaction,
-        long movieId,
-        DateTime weekEndDate,
-        KobisWeeklyBoxOfficeMovie movie,
+        IReadOnlyList<KobisWeeklyBoxOfficeResult> weeks,
+        IReadOnlyDictionary<string, long> movieIds,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            IF EXISTS (SELECT 1 FROM dbo.PastMovieRankings WHERE WeekEndDate = @WeekEndDate AND MovieId = @MovieId)
-            BEGIN
-                UPDATE dbo.PastMovieRankings
-                SET Rank = @Rank,
-                    WeeklyAudience = @WeeklyAudience,
-                    CumulativeAudience = @CumulativeAudience,
-                    UpdatedAt = SYSUTCDATETIME()
-                WHERE WeekEndDate = @WeekEndDate AND MovieId = @MovieId;
-                SELECT CAST(0 AS bit);
-            END
-            ELSE
-            BEGIN
-                INSERT dbo.PastMovieRankings
-                    (MovieId, WeekEndDate, Rank, WeeklyAudience, CumulativeAudience)
-                VALUES
-                    (@MovieId, @WeekEndDate, @Rank, @WeeklyAudience, @CumulativeAudience);
-                SELECT CAST(1 AS bit);
-            END
+        const string createTempTableSql = """
+            CREATE TABLE #IncomingPastMovieRankings
+            (
+                MovieId bigint NOT NULL,
+                WeekEndDate date NOT NULL,
+                Rank tinyint NOT NULL,
+                WeeklyAudience bigint NOT NULL,
+                CumulativeAudience bigint NOT NULL,
+                PRIMARY KEY (WeekEndDate, MovieId)
+            );
+            """;
+        await using (var createTempTable = new SqlCommand(createTempTableSql, connection, transaction))
+            await createTempTable.ExecuteNonQueryAsync(cancellationToken);
+
+        var table = new DataTable();
+        table.Columns.Add("MovieId", typeof(long));
+        table.Columns.Add("WeekEndDate", typeof(DateTime));
+        table.Columns.Add("Rank", typeof(byte));
+        table.Columns.Add("WeeklyAudience", typeof(long));
+        table.Columns.Add("CumulativeAudience", typeof(long));
+
+        foreach (KobisWeeklyBoxOfficeResult week in weeks)
+        {
+            foreach (KobisWeeklyBoxOfficeMovie movie in week.Movies)
+            {
+                table.Rows.Add(
+                    movieIds[movie.MovieCode], week.WeekEndDate.Date, Convert.ToByte(movie.Rank),
+                    movie.WeeklyAudience, movie.CumulativeAudience);
+            }
+        }
+
+        if (table.Rows.Count > 0)
+        {
+            using var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction)
+            {
+                DestinationTableName = "#IncomingPastMovieRankings"
+            };
+            foreach (DataColumn column in table.Columns)
+                bulkCopy.ColumnMappings.Add(column.ColumnName, column.ColumnName);
+            await bulkCopy.WriteToServerAsync(table, cancellationToken);
+        }
+
+        const string upsertSql = """
+            UPDATE target
+            SET Rank = source.Rank,
+                WeeklyAudience = source.WeeklyAudience,
+                CumulativeAudience = source.CumulativeAudience,
+                UpdatedAt = SYSUTCDATETIME()
+            FROM dbo.PastMovieRankings target
+            INNER JOIN #IncomingPastMovieRankings source
+                ON source.WeekEndDate = target.WeekEndDate
+               AND source.MovieId = target.MovieId;
+            DECLARE @UpdatedCount int = @@ROWCOUNT;
+
+            INSERT dbo.PastMovieRankings
+                (MovieId, WeekEndDate, Rank, WeeklyAudience, CumulativeAudience)
+            SELECT source.MovieId, source.WeekEndDate, source.Rank,
+                   source.WeeklyAudience, source.CumulativeAudience
+            FROM #IncomingPastMovieRankings source
+            WHERE NOT EXISTS
+            (
+                SELECT 1
+                FROM dbo.PastMovieRankings target
+                WHERE target.WeekEndDate = source.WeekEndDate
+                  AND target.MovieId = source.MovieId
+            );
+            DECLARE @InsertedCount int = @@ROWCOUNT;
+
+            SELECT @InsertedCount, @UpdatedCount;
             """;
 
-        await using var command = new SqlCommand(sql, connection, transaction);
-        command.Parameters.Add("@MovieId", SqlDbType.BigInt).Value = movieId;
-        command.Parameters.Add("@WeekEndDate", SqlDbType.Date).Value = weekEndDate.Date;
-        command.Parameters.Add("@Rank", SqlDbType.TinyInt).Value = movie.Rank;
-        command.Parameters.Add("@WeeklyAudience", SqlDbType.BigInt).Value = movie.WeeklyAudience;
-        command.Parameters.Add("@CumulativeAudience", SqlDbType.BigInt).Value = movie.CumulativeAudience;
-        return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
+        await using var command = new SqlCommand(upsertSql, connection, transaction);
+        await using SqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return (reader.GetInt32(0), reader.GetInt32(1));
+    }
+
+    private static async Task UpsertSyncWeeksAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        IReadOnlyList<KobisWeeklyBoxOfficeResult> weeks,
+        CancellationToken cancellationToken)
+    {
+        if (weeks.Count == 0)
+            return;
+
+        const string createTempTableSql = """
+            CREATE TABLE #IncomingPastMovieSyncWeeks
+            (
+                WeekEndDate date NOT NULL PRIMARY KEY,
+                RecordCount int NOT NULL
+            );
+            """;
+        await using (var createTempTable = new SqlCommand(createTempTableSql, connection, transaction))
+            await createTempTable.ExecuteNonQueryAsync(cancellationToken);
+
+        var table = new DataTable();
+        table.Columns.Add("WeekEndDate", typeof(DateTime));
+        table.Columns.Add("RecordCount", typeof(int));
+        foreach (KobisWeeklyBoxOfficeResult week in weeks)
+            table.Rows.Add(week.WeekEndDate.Date, week.Movies.Count);
+
+        using (var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.Default, transaction)
+               { DestinationTableName = "#IncomingPastMovieSyncWeeks" })
+        {
+            bulkCopy.ColumnMappings.Add("WeekEndDate", "WeekEndDate");
+            bulkCopy.ColumnMappings.Add("RecordCount", "RecordCount");
+            await bulkCopy.WriteToServerAsync(table, cancellationToken);
+        }
+
+        const string upsertSql = """
+            UPDATE target
+            SET RecordCount = source.RecordCount,
+                LastSyncedAt = SYSUTCDATETIME()
+            FROM dbo.PastMovieSyncWeeks target
+            INNER JOIN #IncomingPastMovieSyncWeeks source
+                ON source.WeekEndDate = target.WeekEndDate;
+
+            INSERT dbo.PastMovieSyncWeeks (WeekEndDate, RecordCount)
+            SELECT source.WeekEndDate, source.RecordCount
+            FROM #IncomingPastMovieSyncWeeks source
+            WHERE NOT EXISTS
+            (
+                SELECT 1
+                FROM dbo.PastMovieSyncWeeks target
+                WHERE target.WeekEndDate = source.WeekEndDate
+            );
+            """;
+
+        await using var command = new SqlCommand(upsertSql, connection, transaction);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static object ParseReleaseDate(string value) =>

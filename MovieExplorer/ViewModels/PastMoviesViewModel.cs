@@ -10,13 +10,14 @@ public sealed class PastMoviesViewModel : PagedViewModel<Movie>
 {
     private const int MaximumTmdbEnrichmentCount = 100;
     private const int RecentRefreshDays = 28;
+    private static readonly TimeSpan RecentRefreshInterval = TimeSpan.FromHours(24);
     private readonly WeeklyBoxOfficeSyncRepository repository = new(DatabaseSettings.ConnectionString);
     private readonly Action<Movie> openMovie;
     private List<Movie> movies = [];
     private IReadOnlyList<string> genres = ["전체"];
     private readonly IReadOnlyList<string> sortOptions =
     [
-        "누적 관객 많은순", "기간 관객 많은순", "개봉일 최신순",
+        "누적 관객 많은순", "개봉일 최신순",
         "개봉일 오래된순", "평점 높은순", "제목순"
     ];
     private DateTime? fromDate = DateTime.Today.AddYears(-1);
@@ -78,9 +79,12 @@ public sealed class PastMoviesViewModel : PagedViewModel<Movie>
         try
         {
             List<DateTime> expected = KobisApiClient.GetWeekEndDates(start, end);
-            HashSet<DateTime> stored = await repository.GetStoredWeekEndDatesAsync(start, end);
+            Dictionary<DateTime, DateTime> syncedAt = await repository.GetWeekSyncDatesAsync(start, end);
             DateTime refreshCutoff = DateTime.Today.AddDays(-RecentRefreshDays);
-            List<DateTime> missing = expected.Where(date => !stored.Contains(date.Date) || date >= refreshCutoff).ToList();
+            DateTime staleBefore = DateTime.UtcNow.Subtract(RecentRefreshInterval);
+            List<DateTime> missing = expected.Where(date =>
+                !syncedAt.TryGetValue(date.Date, out DateTime lastSyncedAt) ||
+                date >= refreshCutoff && lastSyncedAt < staleBefore).ToList();
 
             if (missing.Count > 0)
             {
@@ -172,7 +176,7 @@ public sealed class PastMoviesViewModel : PagedViewModel<Movie>
         Rank = kobis.BestRank,
         DailyAudience = kobis.PeriodAudience,
         CumulativeAudience = kobis.CumulativeAudience,
-        AudienceContextLabel = $"최고 {kobis.BestRank}위 · 기간 {kobis.PeriodAudience:N0}명 · 누적 {kobis.CumulativeAudience:N0}명"
+        AudienceContextLabel = $"누적 관객 {kobis.CumulativeAudience:N0}명"
     };
 
     private void ApplyFilter()
@@ -181,7 +185,6 @@ public sealed class PastMoviesViewModel : PagedViewModel<Movie>
             MovieViewModelHelpers.Matches(movie, SearchQuery.Trim(), SelectedGenre));
         filtered = SelectedSort switch
         {
-            "기간 관객 많은순" => filtered.OrderByDescending(movie => movie.DailyAudience),
             "개봉일 최신순" => filtered.OrderByDescending(movie => MovieViewModelHelpers.ParseDisplayDate(movie.ReleaseDate) ?? DateTime.MinValue),
             "개봉일 오래된순" => filtered.OrderBy(movie => MovieViewModelHelpers.ParseDisplayDate(movie.ReleaseDate) ?? DateTime.MaxValue),
             "평점 높은순" => filtered.OrderByDescending(movie => movie.VoteAverage),

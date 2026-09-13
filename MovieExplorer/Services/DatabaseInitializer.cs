@@ -173,6 +173,28 @@ public static class DatabaseInitializer
             CREATE INDEX IX_PastMovieRankings_WeekEndDate_Rank
                 ON dbo.PastMovieRankings(WeekEndDate, Rank) INCLUDE (MovieId, WeeklyAudience, CumulativeAudience);
 
+        IF OBJECT_ID(N'dbo.PastMovieSyncWeeks', N'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.PastMovieSyncWeeks
+            (
+                WeekEndDate date NOT NULL CONSTRAINT PK_PastMovieSyncWeeks PRIMARY KEY,
+                RecordCount int NOT NULL,
+                LastSyncedAt datetime2(0) NOT NULL CONSTRAINT DF_PastMovieSyncWeeks_LastSyncedAt DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT CK_PastMovieSyncWeeks_RecordCount CHECK (RecordCount >= 0)
+            );
+        END;
+
+        INSERT dbo.PastMovieSyncWeeks (WeekEndDate, RecordCount, LastSyncedAt)
+        SELECT rankings.WeekEndDate, COUNT(*), MAX(rankings.UpdatedAt)
+        FROM dbo.PastMovieRankings rankings
+        WHERE NOT EXISTS
+        (
+            SELECT 1
+            FROM dbo.PastMovieSyncWeeks synced
+            WHERE synced.WeekEndDate = rankings.WeekEndDate
+        )
+        GROUP BY rankings.WeekEndDate;
+
         IF OBJECT_ID(N'dbo.UpcomingMovieCache', N'U') IS NULL
         BEGIN
             CREATE TABLE dbo.UpcomingMovieCache

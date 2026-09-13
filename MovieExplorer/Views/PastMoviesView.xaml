@@ -29,11 +29,15 @@
 
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
                         <TextBlock Text="집계 시작일" Margin="0,0,0,8"/>
-                        <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="13"/>
+                        <DatePicker SelectedDate="{Binding FromDate, Mode=TwoWay}"
+                                    DisplayDateEnd="{Binding MaximumDate, Mode=OneWay}"
+                                    Padding="5" FontSize="13"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="집계 종료일" Margin="0,0,0,8"/>
-                        <DatePicker SelectedDate="{Binding ToDate, Mode=TwoWay}" DisplayDateEnd="{Binding MaximumDate}" Padding="5" FontSize="13"/>
+                        <DatePicker SelectedDate="{Binding ToDate, Mode=TwoWay}"
+                                    DisplayDateEnd="{Binding MaximumDate, Mode=OneWay}"
+                                    Padding="5" FontSize="13"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Margin="0,0,12,0">
                         <TextBlock Text="영화 제목 · 줄거리 검색" Margin="0,0,0,8"/>
